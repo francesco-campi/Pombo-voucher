@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2"]
+
+[tool.setuptools]
+packages = ["oligo_seq"]
+
+[tool.setuptools.dynamic]
+#version = {attr = "my_package.VERSION"}
+readme = {file = "README.md"}
+
+[tool.setuptools_scm]
+write_to = "oligo_designer_toolsuite/_version.py"
+
+[project]
+name = "oligo-designer-toolsuite"
+dynamic = ["version"]
+#version = "1.0.2"
+authors = [
+  {name="Francesco Campi"},
+]
+description = "Develop oligo design pipelines for sequencing experiments."
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "pytorch",
+]
+
+
+[project.scripts]
+padlock_probe_designer = "oligo_seq.pipelines.generate_artificial_dataset:main"
