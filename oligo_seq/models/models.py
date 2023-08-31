@@ -2,26 +2,35 @@ import torch
 from torch import nn
 from torch.nn.utils import rnn
 
+def parse_act_function(act_function: str):
+    if act_function == 'relu':
+        return nn.ReLU()
+    if act_function == 'tanh':
+        return nn.Tanh()
+    else:
+        raise ValueError(f"{act_function} is not supported.")
+
 
 class OligoMLP(nn.Module):
     """Base MLP class that geenrates the duplexing score predictions from the One-Hot encodings of the two sequences and additional features sucha as the GC content and the melting temperature difference. 
     """
 
-    def __init__(self, input_dim: int, hidden_dims: list[int], act_function: nn.Module = nn.ReLU()) -> None:
+    def __init__(self, input_size: int, hidden_size: int, n_layers : int, act_function: str = "relu", dropout: float = 0) -> None:
         """Base MLP class that geenrates the duplexing score predictions from the One-Hot encodings of the two sequences and additional features sucha as the GC content and the melting temperature difference. 
 
         Args:
-            input_dim (int): DImension of the input ( 4*seq length + 4*seq_length + add_features)
+            input_size (int): DImension of the input ( 4*seq length + 4*seq_length + add_features)
             hidden_dims (list[int]): List wiht the hidden dimensions of each layer of the network, the length of the list represnts the number of layers.
             act_function (nn.Module, optional): Activation function used in the network. Defaults to nn.ReLU().
         """
         super().__init__()
-        dimensions = [input_dim] + hidden_dims
+        act_function = parse_act_function(act_function)
+        dimensions = [input_size] + [hidden_size for i in range(n_layers)]
         layers = []
         for i in range(len(dimensions)-1): #last layer is added later
-            layers.extend([nn.Linear(in_features=dimensions[i], out_features=dimensions[i+1]), act_function])
+            layers.extend([nn.Linear(in_features=dimensions[i], out_features=dimensions[i+1]), act_function, nn.Dropout(p=dropout)])
             # TODO: add regularization
-        layers.extend([nn.Linear(in_features=dimensions[-1], out_features=1)]) # last layer
+        layers.append(nn.Linear(in_features=dimensions[-1], out_features=1)) # last layer
         self.mlp = nn.Sequential(*layers)
         self.double()
 
@@ -46,33 +55,34 @@ class OligoRNN(nn.Module):
     shared across all the steps and the uoutput is pooled
     """
 
-    def __init__(self, input_size: int, features: int, hidden_size: int, nonlinearity: str = 'tanh', pool: str = 'max', act=torch.nn.ReLU(), dropout=0) -> None:
+    def __init__(self, input_size: int, features_size: int, hidden_size: int, n_layers: int, nonlinearity: str = 'tanh', pool: str = 'max', act_function: str = "relu", n_layers_mlp: int = 1, dropout: float = 0) -> None:
         super().__init__()
+        act_function = parse_act_function(act_function)
         self.hidden_size= hidden_size
         self.pool = pool
-        self.recurrent_block = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, nonlinearity=nonlinearity, dropout=dropout)
-        self.shared_MLP = torch.nn.Sequential(
-            torch.nn.Linear(in_features=hidden_size, out_features=hidden_size), 
-            act, 
-            nn.Dropout(p=dropout),
-            torch.nn.Linear(in_features=hidden_size, out_features=hidden_size),
-        )
+        self.recurrent_block = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=n_layers, nonlinearity=nonlinearity, dropout=dropout)
+        self.shared_MLP = []
+        for _ in range(n_layers_mlp-n_layers_mlp):
+            self.shared_MLP.extend([torch.nn.Linear(in_features=hidden_size, out_features=hidden_size), act_function, nn.Dropout(p=dropout)])
+        self.shared_MLP.append(torch.nn.Linear(in_features=hidden_size, out_features=hidden_size))
+        self.shared_MLP = nn.Sequential(*self.shared_MLP)
         self.features_mlp = torch.nn.Sequential(
-            torch.nn.Linear(in_features=features, out_features=features), 
-            act, 
+            torch.nn.Linear(in_features=features_size, out_features=features_size), 
+            act_function, 
             nn.Dropout(p=dropout),
-            torch.nn.Linear(in_features=features, out_features=features),
+            torch.nn.Linear(in_features=features_size, out_features=features_size),
         )
-        self.final_MLP = torch.nn.Sequential(
-            torch.nn.Linear(in_features=hidden_size + features, out_features=hidden_size), 
-            act, 
-            nn.Dropout(p=dropout),
-            torch.nn.Linear(in_features=hidden_size, out_features=1),
-        )
+        self.final_MLP = []
+        for _ in range(n_layers_mlp):
+            self.final_MLP.extend([torch.nn.Linear(in_features=hidden_size + features_size, out_features=hidden_size + features_size), act_function, nn.Dropout(p=dropout)])
+        self.final_MLP.append(torch.nn.Linear(in_features=hidden_size + features_size, out_features=1))
+        self.final_MLP = nn.Sequential(*self.final_MLP)
         self.double()
 
 
-    def forward(self, sequences, features):
+    def forward(self, data):
+        sequences = data[0]
+        features = data[1]
         hidden_states = self.recurrent_block(sequences)[0]
         # vectorize the porcess of all the hidden states of the batch
         processed_hidden_states = self.shared_MLP(hidden_states.data) 
@@ -101,7 +111,7 @@ class OligoRNN(nn.Module):
 class OligoLSTM(OligoRNN):
 
 
-    def __init__(self, input_size: int, features: int, hidden_size: int, pool: str = 'max', act=torch.nn.ReLU(), dropout=0) -> None:
-        super().__init__(input_size=input_size, features=features, hidden_size=hidden_size, pool=pool, act=act, dropout=dropout)
-        self.recurrent_block = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, dropout=dropout)
+    def __init__(self, input_size: int, features_size: int, hidden_size: int, n_layers: int, pool: str = 'max', act_function: str = "relu", n_layers_mlp: int = 1, dropout=0) -> None:
+        super().__init__(input_size=input_size, features_size=features_size, hidden_size=hidden_size, n_layers=n_layers, pool=pool, act_function=act_function,  n_layers_mlp=n_layers_mlp, dropout=dropout)
+        self.recurrent_block = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=n_layers, dropout=dropout)
         self.double()

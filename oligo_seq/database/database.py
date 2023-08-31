@@ -11,15 +11,19 @@ import pandas as pd
 class MLPDataset(data.Dataset):
 
 
-    def __init__(self, path: str, oligo_length: int) -> None:
+    def __init__(self, path: str) -> None:
         super().__init__()
         database = pd.read_csv(path, index_col=0) # dictionary with sequences, features and labels tensors
+        oligo_length = database["oligo_length"][0]
         encodings = torch.empty((len(database), 8*oligo_length))
         for i, row in database.iterrows():
             oligo = row["oligo_sequence"]
             off_target = row["off_target_sequence"]
             encodings[i,:] = torch.cat([self.encode_sequence(oligo), self.encode_sequence(off_target)])
         self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.double)
+        self.mean = self.labels.mean()
+        self.std = self.labels.std()
+        self.labels = (self.labels - self.mean)/self.std # normalize
         features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.double)
         self.data = torch.cat([encodings, features], dim=1)
 
@@ -57,16 +61,19 @@ class RNNDataset(data.Dataset):
 
     def __init__(self, path: str) -> None:
         super().__init__()
-        database = pd.read_csv(path, index_col=0) # dictionary with sequences, features and labels tensors
+        database = pd.read_csv(path, index_col=0).head(2000) # dictionary with sequences, features and labels tensors
         self.sequences = [] # list of tensors
         for i, row in database.iterrows():
             oligo = row["oligo_sequence"]
             off_target = row["off_target_sequence"]
             encoding = torch.empty((len(oligo), 8), dtype=torch.double) #update for deletions and insertions
             for j in range(len(oligo)):
-                encoding[j,:] = torch.tensor(self.econde_nt(oligo[j]) + self.econde_nt(off_target[j]), dtype=torch.double)
+                encoding[j,:] = torch.tensor(self.encode_nt(oligo[j]) + self.encode_nt(off_target[j]), dtype=torch.double)
             self.sequences.append(encoding)
         self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.double)
+        self.mean = self.labels.mean()
+        self.std = self.labels.std()
+        self.labels = (self.labels - self.mean)/self.std # normalize
         self.features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.double)
         
 
@@ -79,32 +86,32 @@ class RNNDataset(data.Dataset):
         return self.sequences[index], self.features[index,:], self.labels[index] 
     
 
-def econde_nt(self, nt:str) -> list[str]:
-        """_summary_
+    def encode_nt(self, nt:str) -> list[str]:
+            """_summary_
 
-        Args:
-            nt (str): _description_
+            Args:
+                nt (str): _description_
 
-        Returns:
-            list[str]: _description_
-        """
-        #encoding order is A, C, T, G
-        if nt == 'A' or nt == 'a':
-            nt_encoding = [1,0,0,0]
-        elif nt == 'C' or nt == 'c':
-            nt_encoding = [0,1,0,0]
-        elif nt == 'T' or nt == 't':
-            nt_encoding = [0,0,1,0]
-        elif nt == 'G' or nt == 'g':
-            nt_encoding = [0,0,0,1]
-        else:
-            Warning(f"Nucleotide {nt} not recognized.")
-        return nt_encoding
+            Returns:
+                list[str]: _description_
+            """
+            #encoding order is A, C, T, G
+            if nt == 'A' or nt == 'a':
+                nt_encoding = [1,0,0,0]
+            elif nt == 'C' or nt == 'c':
+                nt_encoding = [0,1,0,0]
+            elif nt == 'T' or nt == 't':
+                nt_encoding = [0,0,1,0]
+            elif nt == 'G' or nt == 'g':
+                nt_encoding = [0,0,0,1]
+            else:
+                Warning(f"Nucleotide {nt} not recognized.")
+            return nt_encoding
     
 
 
 
-def pack_collate(batch: list) -> Tuple(rnn.PackedSequence, torch.Tensor, torch.Tensor):
+def pack_collate(batch: list) -> Tuple[rnn.PackedSequence, torch.Tensor, torch.Tensor]:
     """Colalte function for the RNNDataset that generates a PackedSequence for the a list of sequences encodings in the batch.
     In this way can still train the input in batches and explot the speed-ups that batching delivers through vectorization.
 
@@ -122,4 +129,4 @@ def pack_collate(batch: list) -> Tuple(rnn.PackedSequence, torch.Tensor, torch.T
     lengths, perm_idx = lengths.sort(0, descending=True)
     sorted_sequences = [sequences[i] for i in perm_idx]
     padded_sequences = rnn.pad_sequence(sequences=sorted_sequences, batch_first=True)
-    return rnn.pack_padded_sequence(input=padded_sequences, lengths=lengths, batch_first=True), features, labels
+    return (rnn.pack_padded_sequence(input=padded_sequences, lengths=lengths, batch_first=True), features), labels

@@ -1,0 +1,26 @@
+dataset_path: data/datasets/artificial_dataset_35_35.csv   # path to the dataset
+models_path: data/models
+
+# fixed hyperparameters
+model: lstm  # model architectura tha will be trained
+input_size: 8 # dimension of the input data
+features_size: 6 # number of additional features
+
+n_trials: 5  # number of hyperparameters combinations optuna will try
+n_epochs: 200 # maximum number of epoch executed during training 
+split_lengths: [0.4, 0.2, 0.4]  # train , validation and test splits
+split_seed: 1234
+patience: 50
+scheduler_factor: 0.5
+scheduler_patience: 15
+
+# tunable hyperparameters: will be sampled in the interval [min, max]
+hidden_size: [32, 128] # dimension of the hidden layers
+n_layers: [1, 2]  # number of stacked rnns
+n_layers_mlp: [1,5] # number of layers of the mlps
+act_function: [relu, tanh] # activation function of the mlp blocks
+pool: [max, min, mean, sum]
+dropout: [0, 0.5] # dropot probability
+
+batch_size: [32, 256]
+lr: [0.00001, 0.01] # learning rate sampled from a loguniform distribution
