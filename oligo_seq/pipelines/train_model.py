@@ -31,6 +31,8 @@ class Objective:
 
     def __call__(self, trail: optuna.Trial) -> Any:
 
+        self.logging.info(f"Start trail number {trail.number}.")
+        
         ################
         # define model #
         ################
@@ -95,7 +97,6 @@ class Objective:
         # train the model #
         ###################
 
-        self.logging.info(f"Start trail number {trail.number}.")
         max_patience = self.config["patience"] # for early sotpping
         best_validation_loss = None
         best_model = model.state_dict()
@@ -212,6 +213,7 @@ def main():
     #####################
 
     study = optuna.create_study()
+    logging.info("Study created.")
     study.optimize(func=Objective(config=config, dataset=dataset, logging=logging), n_trials=config["n_trials"])
 
 
