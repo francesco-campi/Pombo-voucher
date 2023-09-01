@@ -17,6 +17,7 @@ from torch import optim
 import optuna
 from oligo_seq.database import *
 from oligo_seq.models import *
+import wandb
 
 
 
@@ -98,7 +99,8 @@ class Objective:
         ###################
         # train the model #
         ###################
-
+        os.environ["WANDB_SILENT"] = "true"
+        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"]}, name=str(trail.number))
         max_patience = self.config["patience"] # for early sotpping
         best_validation_loss = None
         best_model = model.state_dict()
@@ -108,7 +110,7 @@ class Objective:
             start = time.time()
             train_loss = self.train_epoch(model=model, dataloader=train_loader, loss=loss, optimizer=optimizer)
             validation_loss = self.eval_epoch(model=model, dataloader=validation_loader, loss=loss)
-            # wandb log
+            wandb.log({"train_loss": train_loss, "validation_loss": validation_loss})
             scheduler.step(validation_loss)
             if best_validation_loss is None or validation_loss < best_validation_loss:
                 best_validation_loss = validation_loss
@@ -125,6 +127,7 @@ class Objective:
             if (i+1) % 10 == 0:
                 self.logging.info(f"Epoch {i+1}: \t Train Loss: {train_loss}, \t Validation Loss: {validation_loss}, Computation time : {time.time() - start}")
         logging.info(f"Best validation loss obtained is {best_validation_loss}.")
+        
 
         ###################
         # store the model #
@@ -138,7 +141,8 @@ class Objective:
         hyperparameters_file = f"{self.config['model']}_{trail.number}.json"
         with open(os.path.join(model_dir, hyperparameters_file), 'w') as f:
             json.dump(hyperparameters, f)
-
+        wandb.finish()
+        
         return best_validation_loss
 
 
@@ -214,6 +218,8 @@ def main():
     # initialize optuna #
     #####################
 
+    optuna.logging.enable_propagation()  # Propagate logs to the root logger.
+    optuna.logging.disable_default_handler()  # Stop showing logs in sys.stderr.
     study = optuna.create_study()
     logging.info("Study created.")
     study.optimize(func=Objective(config=config, dataset=dataset, logging=logging), n_trials=config["n_trials"])

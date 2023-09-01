@@ -13,7 +13,7 @@ class MLPDataset(data.Dataset):
 
     def __init__(self, path: str) -> None:
         super().__init__()
-        database = pd.read_csv(path, index_col=0).head(200) # dictionary with sequences, features and labels tensors
+        database = pd.read_csv(path, index_col=0) # dictionary with sequences, features and labels tensors
         oligo_length = database["oligo_length"][0]
         encodings = torch.empty((len(database), 8*oligo_length))
         for i, row in database.iterrows():
