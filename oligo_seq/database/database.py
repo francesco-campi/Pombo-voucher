@@ -122,7 +122,7 @@ def pack_collate(batch: list) -> Tuple[rnn.PackedSequence, torch.Tensor, torch.T
         tuple: Tuple containig the batch elements, namely that encoded sequences, the additional features and the groud-truth labels.
     """
 
-    sequences, features, labels = data.default_collate(batch)
+    sequences, features, labels = data._utils.collate.default_collate(batch)
     sequences = [sequences[i,:,:] for i in range(len(sequences))]
     # sort the sequences in decreasing length order
     lengths = torch.tensor(list(map(len, sequences)))
