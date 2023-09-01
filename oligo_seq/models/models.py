@@ -88,9 +88,7 @@ class OligoRNN(nn.Module):
         processed_hidden_states = self.shared_MLP(hidden_states.data) 
         # create a new PackedSeequence class and unpack it
         processed_hidden_states = rnn.PackedSequence(data=processed_hidden_states, batch_sizes=hidden_states.batch_sizes) 
-        padded_hidden_states, lengths = rnn.pad_packed_sequence(processed_hidden_states, batch_first=True)
-        unpacked_shidden_state = rnn.unpad_sequence(padded_hidden_states, lengths, batch_first=True)
-        # processed_hidden_states = rnn.unpack_sequence(processed_hidden_states)
+        unpacked_hidden_state, _ = rnn.pad_packed_sequence(processed_hidden_states, batch_first=True)
         # pool the hidden states
         if self.pool == "max":
             pool_function = lambda h: torch.max(input=h, dim=0, keepdim=True)[0] # the output is a tuple of tensors
@@ -102,7 +100,7 @@ class OligoRNN(nn.Module):
             pool_function = lambda h: torch.sum(input=h, dim=0, keepdim=True)
         else:
             Warning(f"The pooling function {self.pool} is not supported.") #change warning type
-        pooled_hidden_states = torch.cat([pool_function(h) for h in unpacked_shidden_state], dim=0)
+        pooled_hidden_states = torch.cat([pool_function(h) for h in unpacked_hidden_state], dim=0)
         processed_features = self.features_mlp(features)
         # generate the final prediction
         return self.final_MLP(torch.cat([pooled_hidden_states, processed_features], dim=1)).flatten()
