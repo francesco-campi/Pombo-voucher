@@ -61,7 +61,7 @@ class RNNDataset(data.Dataset):
 
     def __init__(self, path: str) -> None:
         super().__init__()
-        database = pd.read_csv(path, index_col=0).head(2000) # dictionary with sequences, features and labels tensors
+        database = pd.read_csv(path, index_col=0) # dictionary with sequences, features and labels tensors
         self.sequences = [] # list of tensors
         for i, row in database.iterrows():
             oligo = row["oligo_sequence"]

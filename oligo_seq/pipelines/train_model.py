@@ -6,6 +6,8 @@ import os
 import json
 from tqdm import tqdm
 import time
+from datetime import datetime
+import logging
 sys.path.append(os.getcwd())
 
 import torch
@@ -22,9 +24,10 @@ from oligo_seq.models import *
 
 class Objective:
 
-    def __init__(self, config, dataset) -> None:
+    def __init__(self, config, dataset, logging: logging.Logger) -> None:
         self.config = config
         self.dataset = dataset
+        self.logging = logging
 
     def __call__(self, trail: optuna.Trial) -> Any:
 
@@ -92,6 +95,7 @@ class Objective:
         # train the model #
         ###################
 
+        self.logging.info(f"Start trail number {trail.number}.")
         max_patience = self.config["patience"] # for early sotpping
         best_validation_loss = None
         best_model = model.state_dict()
@@ -115,13 +119,15 @@ class Objective:
                 #restore teh best model
                 model.load_state_dict(best_model)
                 break
-            if i % 5 == 0:
-                print(f"Epoch {i+1}: \t Train Loss: {train_loss}, \t Validation Loss: {validation_loss}, Computation time : {time.time() - start}")
+            if (i+1) % 10 == 0:
+                self.logging.info(f"Epoch {i+1}: \t Train Loss: {train_loss}, \t Validation Loss: {validation_loss}, Computation time : {time.time() - start}")
+        logging.info(f"Best validation loss obtained is {best_validation_loss}.")
 
         ###################
         # store the model #
         ###################
 
+        model.load_state_dict(best_model) # load the model wiht the best validation error
         model_dir = os.path.join(self.config["models_path"], self.config["model"])
         os.makedirs(model_dir, exist_ok=True)
         model_file = f"{self.config['model']}_{trail.number}.pt"
@@ -174,6 +180,20 @@ def main():
     with open(args.config, "r") as handle:
         config = yaml.safe_load(handle)
 
+    ##############
+    # set logger #
+    ##############
+
+    timestamp = datetime.now()
+    file_logger = f"log_train_{config['model']}_{timestamp.year}-{timestamp.month}-{timestamp.day}-{timestamp.hour}-{timestamp.minute}.txt"
+    logging.getLogger("padlock_probe_designer")
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        level=logging.NOTSET,
+        handlers=[logging.FileHandler(file_logger), logging.StreamHandler()],
+    )
+    logging.captureWarnings(True)
+
     ##################
     # define dataset #
     ##################
@@ -185,13 +205,14 @@ def main():
         dataset = RNNDataset(path=config["dataset_path"])
     else: 
         raise ValueError(f"{config['model']} is not supported")
+    logging.info(f"Dataset generated with {len(dataset)} instances.")
 
     #####################
     # initialize optuna #
     #####################
 
     study = optuna.create_study()
-    study.optimize(func=Objective(config=config, dataset=dataset), n_trials=config["n_trials"])
+    study.optimize(func=Objective(config=config, dataset=dataset, logging=logging), n_trials=config["n_trials"])
 
 
 if __name__ == "__main__":
