@@ -148,7 +148,7 @@ class Objective:
         for data, label in dataloader:
             pred = model(data)
             batch_loss = loss(pred, label)
-            cumulative_loss =+ batch_loss
+            cumulative_loss += batch_loss
             batch_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
