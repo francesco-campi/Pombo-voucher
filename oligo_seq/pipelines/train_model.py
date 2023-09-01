@@ -100,14 +100,14 @@ class Objective:
         # train the model #
         ###################
         os.environ["WANDB_SILENT"] = "true"
-        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"]}, name=str(trail.number))
+        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
         max_patience = self.config["patience"] # for early sotpping
         best_validation_loss = None
         best_model = model.state_dict()
         patience = 0
         epoch_best_model = 0
+        start = time.time()
         for i in range(self.config["n_epochs"]):
-            start = time.time()
             train_loss = self.train_epoch(model=model, dataloader=train_loader, loss=loss, optimizer=optimizer)
             validation_loss = self.eval_epoch(model=model, dataloader=validation_loader, loss=loss)
             wandb.log({"train_loss": train_loss, "validation_loss": validation_loss})
@@ -124,9 +124,7 @@ class Objective:
                 #restore teh best model
                 model.load_state_dict(best_model)
                 break
-            if (i+1) % 10 == 0:
-                self.logging.info(f"Epoch {i+1}: \t Train Loss: {train_loss}, \t Validation Loss: {validation_loss}, Computation time : {time.time() - start}")
-        logging.info(f"Best validation loss obtained is {best_validation_loss}.")
+        logging.info(f"Computation time: {time.time() - start}.")
         
 
         ###################
@@ -142,7 +140,7 @@ class Objective:
         with open(os.path.join(model_dir, hyperparameters_file), 'w') as f:
             json.dump(hyperparameters, f)
         wandb.finish()
-        
+
         return best_validation_loss
 
 
@@ -199,7 +197,7 @@ def main():
         level=logging.NOTSET,
         handlers=[logging.FileHandler(file_logger), logging.StreamHandler()],
     )
-    logging.captureWarnings(True)
+    # logging.captureWarnings(True)
 
     ##################
     # define dataset #
