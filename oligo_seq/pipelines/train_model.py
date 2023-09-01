@@ -32,7 +32,7 @@ class Objective:
     def __call__(self, trail: optuna.Trial) -> Any:
 
         self.logging.info(f"Start trail number {trail.number}.")
-        
+
         ################
         # define model #
         ################
@@ -78,7 +78,9 @@ class Objective:
         #####################
 
         generator = torch.Generator().manual_seed(self.config["split_seed"])
-        train, validation, test = data.random_split(dataset=self.dataset, lengths=self.config["split_lengths"], generator=generator)
+        split_lenghs = [round(len(self.dataset)*length)  for length in self.config["split_lengths"]]
+        split_lenghs[-1] = len(self.dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
+        train, validation, test = data.random_split(dataset=self.dataset, lengths=split_lenghs, generator=generator)
         batch_size = trail.suggest_int("batch_size", low=self.config["batch_size"][0], high=self.config["batch_size"][1])
         train_loader = data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
         validation_loader = data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
