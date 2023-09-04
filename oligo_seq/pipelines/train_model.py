@@ -32,12 +32,7 @@ class Objective:
     def __call__(self, trail: optuna.Trial) -> Any:
 
         self.logging.info(f"Start trail number {trail.number}.")
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        elif torch.backends.mps.is_available():
-            device = torch.device("mps")
-        else:
-            device = torch.device("cpu")
+        device = torch.device("cuda") if torch.cuda.is_available() is True else torch.device("cpu")
         self.logging.info(f'Using device: {device}')
 
         ################
