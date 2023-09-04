@@ -101,8 +101,8 @@ class Objective:
         ###################
         os.environ["WANDB_SILENT"] = "true"
         wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
-        wandb.define_metric("train_loss", summary="min")
-        wandb.define_metric("validation_loss", summary="min")
+        # wandb.define_metric("train_loss", summary="min")
+        # wandb.define_metric("validation_loss", summary="min")
         max_patience = self.config["patience"] # for early sotpping
         best_validation_loss = None
         best_model = model.state_dict()
@@ -127,7 +127,8 @@ class Objective:
                 model.load_state_dict(best_model)
                 break
         logging.info(f"Computation time: {time.time() - start}.")
-        
+        wandb.summary["validation_loss"] = best_validation_loss
+        wandb.finish()
 
         ###################
         # store the model #
@@ -141,7 +142,6 @@ class Objective:
         hyperparameters_file = f"{self.config['model']}_{trail.number}.json"
         with open(os.path.join(model_dir, hyperparameters_file), 'w') as f:
             json.dump(hyperparameters, f)
-        wandb.finish()
 
         return best_validation_loss
 
