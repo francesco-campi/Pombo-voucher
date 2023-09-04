@@ -155,8 +155,8 @@ class Objective:
     def train_epoch(self, model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
         model.train()
         cumulative_loss = torch.zeros(1,).to(device)
-        batch_device = []
         for batch in dataloader:
+            batch_device = []
             for t in batch:
                 batch_device.append(t.to(device))
             data = batch_device[:-1]
