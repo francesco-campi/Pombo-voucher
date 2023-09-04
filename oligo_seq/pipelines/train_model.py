@@ -101,6 +101,8 @@ class Objective:
         ###################
         os.environ["WANDB_SILENT"] = "true"
         wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
+        wandb.define_metric("train_loss", summary="min")
+        wandb.define_metric("validation_loss", summary="min")
         max_patience = self.config["patience"] # for early sotpping
         best_validation_loss = None
         best_model = model.state_dict()
