@@ -29,10 +29,16 @@ class Objective:
         self.config = config
         self.dataset = dataset
         self.logging = logging
-
     def __call__(self, trail: optuna.Trial) -> Any:
 
         self.logging.info(f"Start trail number {trail.number}.")
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+        self.logging.info(f'Using device: {device}')
 
         ################
         # define model #
@@ -73,6 +79,7 @@ class Objective:
             collate_fn = pack_collate
         else:
             raise ValueError(f"{self.config['model']} is not supported")
+        model.to(device) # load the model on the cpu
         
         #####################
         # define dataloader #
@@ -107,11 +114,10 @@ class Objective:
         best_validation_loss = None
         best_model = model.state_dict()
         patience = 0
-        epoch_best_model = 0
         start = time.time()
         for i in range(self.config["n_epochs"]):
-            train_loss = self.train_epoch(model=model, dataloader=train_loader, loss=loss, optimizer=optimizer)
-            validation_loss = self.eval_epoch(model=model, dataloader=validation_loader, loss=loss)
+            train_loss = self.train_epoch(model=model, dataloader=train_loader, loss=loss, optimizer=optimizer, device=device)
+            validation_loss = self.eval_epoch(model=model, dataloader=validation_loader, loss=loss, device=device)
             wandb.log({"train_loss": train_loss, "validation_loss": validation_loss})
             scheduler.step(validation_loss)
             if best_validation_loss is None or validation_loss < best_validation_loss:
@@ -146,11 +152,16 @@ class Objective:
         return best_validation_loss
 
 
-    def train_epoch(self, model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, optimizer: optim.Optimizer) -> float:
+    def train_epoch(self, model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> float:
         model.train()
-        cumulative_loss = 0.
-        for data, label in dataloader:
-            pred = model(data)
+        cumulative_loss = torch.zeros(1,).to(device)
+        batch_device = []
+        for batch in dataloader:
+            for t in batch:
+                batch_device.append(t.to(device))
+            data = batch_device[:-1]
+            label = batch_device[-1]
+            pred = model(*data)
             batch_loss = loss(pred, label)
             cumulative_loss += batch_loss
             batch_loss.backward()
@@ -160,12 +171,17 @@ class Objective:
         return loss.item()
 
 
-    def eval_epoch(self,model: nn.Module, dataloader: data.DataLoader, loss: nn.Module) -> float:
+    def eval_epoch(self,model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, device: torch.device) -> float:
         model.eval()
-        cumulative_loss = 0.
+        cumulative_loss = torch.zeros(1,).to(device)
         with torch.no_grad():
-            for data, label in dataloader:
-                pred = model(data)
+            for batch in dataloader:
+                batch_device = []
+                for t in batch:
+                    batch_device.append(t.to(device))
+                data = batch_device[:-1]
+                label = batch_device[-1]
+                pred = model(*data)
                 cumulative_loss += loss(pred, label)
         loss = cumulative_loss/len(dataloader)
         return loss.item()

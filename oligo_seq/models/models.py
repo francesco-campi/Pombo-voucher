@@ -32,7 +32,7 @@ class OligoMLP(nn.Module):
             # TODO: add regularization
         layers.append(nn.Linear(in_features=dimensions[-1], out_features=1)) # last layer
         self.mlp = nn.Sequential(*layers)
-        self.double()
+        self.float()
 
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -77,12 +77,10 @@ class OligoRNN(nn.Module):
             self.final_MLP.extend([torch.nn.Linear(in_features=hidden_size + features_size, out_features=hidden_size + features_size), act_function, nn.Dropout(p=dropout)])
         self.final_MLP.append(torch.nn.Linear(in_features=hidden_size + features_size, out_features=1))
         self.final_MLP = nn.Sequential(*self.final_MLP)
-        self.double()
+        self.float()
 
 
-    def forward(self, data):
-        sequences = data[0]
-        features = data[1]
+    def forward(self, sequences: rnn.PackedSequence, features: torch.Tensor):
         hidden_states = self.recurrent_block(sequences)[0]
         # vectorize the porcess of all the hidden states of the batch
         processed_hidden_states = self.shared_MLP(hidden_states.data) 
@@ -114,4 +112,4 @@ class OligoLSTM(OligoRNN):
     def __init__(self, input_size: int, features_size: int, hidden_size: int, n_layers: int, pool: str = 'max', act_function: str = "relu", n_layers_mlp: int = 1, dropout=0) -> None:
         super().__init__(input_size=input_size, features_size=features_size, hidden_size=hidden_size, n_layers=n_layers, pool=pool, act_function=act_function,  n_layers_mlp=n_layers_mlp, dropout=dropout)
         self.recurrent_block = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=n_layers, dropout=dropout)
-        self.double()
+        self.float()
