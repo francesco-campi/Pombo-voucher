@@ -1,3 +1,6 @@
 data
 output
 wandb
+__pycache__/
+*.pyc
+log_*
