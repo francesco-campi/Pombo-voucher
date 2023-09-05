@@ -16,7 +16,7 @@ scheduler_patience: 15
 
 # tunable hyperparameters: will be sampled in the interval [min, max]
 hidden_size: [64,64] # dimension of the hidden layers
-n_layers: [1, ,1]  # number of stacked rnns
+n_layers: [1,1]  # number of stacked rnns
 n_layers_mlp: [1,1] # number of layers of the mlps
 act_function: [relu] # activation function of the mlp blocks
 pool: [max]
