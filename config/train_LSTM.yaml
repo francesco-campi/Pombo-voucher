@@ -6,7 +6,7 @@ model: lstm  # model architectura tha will be trained
 input_size: 8 # dimension of the input data
 features_size: 6 # number of additional features
 
-n_trials: 50  # number of hyperparameters combinations optuna will try
+n_trials: 1  # number of hyperparameters combinations optuna will try
 n_epochs: 1000 # maximum number of epoch executed during training 
 split_lengths: [0.4, 0.2, 0.4]  # train , validation and test splits
 split_seed: 1234
@@ -15,12 +15,12 @@ scheduler_factor: 0.5
 scheduler_patience: 15
 
 # tunable hyperparameters: will be sampled in the interval [min, max]
-hidden_size: [32, 128] # dimension of the hidden layers
-n_layers: [1, 2]  # number of stacked rnns
-n_layers_mlp: [1,5] # number of layers of the mlps
-act_function: [relu, tanh] # activation function of the mlp blocks
-pool: [max, min, mean, sum]
-dropout: [0, 0.5] # dropot probability
+hidden_size: [64,64] # dimension of the hidden layers
+n_layers: [1, ,1]  # number of stacked rnns
+n_layers_mlp: [1,1] # number of layers of the mlps
+act_function: [relu] # activation function of the mlp blocks
+pool: [max]
+dropout: [0, 0] # dropot probability
 
-batch_size: [32, 256]
-lr: [0.00001, 0.01] # learning rate sampled from a loguniform distribution
+batch_size: [128, 128]
+lr: [0.001, 0.001] # learning rate sampled from a loguniform distribution
