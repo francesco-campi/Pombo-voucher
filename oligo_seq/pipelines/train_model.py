@@ -67,6 +67,7 @@ class Objective:
             hyperparameters["model"]["features_size"] = self.config["features_size"]
             hyperparameters["model"]["hidden_size"] = trail.suggest_int("hidden_size", low=self.config["hidden_size"][0], high=self.config["hidden_size"][1])
             hyperparameters["model"]["n_layers"] = trail.suggest_int("n_layers", low=self.config["n_layers"][0], high=self.config["n_layers"][1])
+            hyperparameters["model"]["n_layers_mlp"] = trail.suggest_int("n_layers_mlp", low=self.config["n_layers_mlp"][0], high=self.config["n_layers_mlp"][1])
             hyperparameters["model"]["act_function"] = trail.suggest_categorical("act_function", choices=self.config["act_function"])
             hyperparameters["model"]["pool"] = trail.suggest_categorical("pool", choices=self.config["pool"])            
             hyperparameters["model"]["dropout"] = trail.suggest_float("dropout", low=self.config["dropout"][0], high=self.config["dropout"][1])
@@ -113,6 +114,7 @@ class Objective:
         for i in range(self.config["n_epochs"]):
             train_loss = self.train_epoch(model=model, dataloader=train_loader, loss=loss, optimizer=optimizer, device=device)
             validation_loss = self.eval_epoch(model=model, dataloader=validation_loader, loss=loss, device=device)
+            # self.logging.info(f"Epoch: {i}, \t Train loss: {train_loss}, \t Validation loss: {validation_loss}")
             wandb.log({"train_loss": train_loss, "validation_loss": validation_loss})
             scheduler.step(validation_loss)
             if best_validation_loss is None or validation_loss < best_validation_loss:
@@ -210,7 +212,7 @@ def main():
         level=logging.NOTSET,
         handlers=[logging.FileHandler(file_logger), logging.StreamHandler()],
     )
-    # logging.captureWarnings(True)
+    logging.captureWarnings(True)
 
     ##################
     # define dataset #
