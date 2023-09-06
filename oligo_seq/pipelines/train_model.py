@@ -8,6 +8,7 @@ from tqdm import tqdm
 import time
 from datetime import datetime
 import logging
+import copy
 sys.path.append(os.getcwd())
 
 import torch
@@ -120,14 +121,12 @@ class Objective:
             if best_validation_loss is None or validation_loss < best_validation_loss:
                 best_validation_loss = validation_loss
                 # patience reset 
-                best_model = model.state_dict()
+                best_model = copy.deepcopy(model.state_dict())
                 patience = 0
             else:
                 # patience update
                 patience += 1
             if patience >= max_patience:
-                #restore teh best model
-                model.load_state_dict(best_model)
                 break
         logging.info(f"Computation time: {time.time() - start}.")
         wandb.summary["validation_loss"] = best_validation_loss
@@ -137,11 +136,10 @@ class Objective:
         # store the model #
         ###################
 
-        model.load_state_dict(best_model) # load the model wiht the best validation error
         model_dir = os.path.join(self.config["models_path"], self.config["model"])
         os.makedirs(model_dir, exist_ok=True)
         model_file = f"{self.config['model']}_{trail.number}.pt"
-        torch.save(model.state_dict(), os.path.join(model_dir, model_file))
+        torch.save(best_model, os.path.join(model_dir, model_file)) # store the best model
         hyperparameters_file = f"{self.config['model']}_{trail.number}.json"
         with open(os.path.join(model_dir, hyperparameters_file), 'w') as f:
             json.dump(hyperparameters, f)
