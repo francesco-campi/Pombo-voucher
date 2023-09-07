@@ -39,22 +39,22 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
 def main():
     # Evaluate the result obtained on teh server
 
-    with open("data/models/other/mlp_0.json") as f:
+    with open("data/models/other/lstm_0.json") as f:
         h_par = json.load(f)
-    # model = OligoLSTM(**h_par["model"])
-    model = OligoMLP(**h_par["model"])
-    model.load_state_dict(torch.load("data/models/other/mlp_0.pt", map_location=torch.device('cpu')))
+    model = OligoLSTM(**h_par["model"])
+    # model = OligoMLP(**h_par["model"])
+    model.load_state_dict(torch.load("data/models/other/lstm_0.pt", map_location=torch.device('cpu')))
 
     # dataset, model, optimizer initialization
     batch_size = 128
-    # dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
-    dataset = MLPDataset(path="data/datasets/artificial_dataset_35_35.csv")
+    dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
+    # dataset = MLPDataset(path="data/datasets/artificial_dataset_35_35.csv")
     generator = torch.Generator().manual_seed(1234)
     split_lenghs = [round(len(dataset)*length)  for length in [0.4, 0.2, 0.4]]
     split_lenghs[-1] = len(dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
     train, validation, test = data.random_split(dataset=dataset, lengths=split_lenghs, generator=generator)
-    collate_fn = None
-    # collate_fn = pack_collate
+    # collate_fn = None
+    collate_fn = pack_collate
     train_loader = torch.utils.data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     validation_loader = torch.utils.data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     test_loader = torch.utils.data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
