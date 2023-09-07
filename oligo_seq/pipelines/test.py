@@ -33,6 +33,7 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             pred = model(*data)
             cumulative_loss += loss(pred, label)
     loss = cumulative_loss/len(dataloader)
+    print(len(dataloader))
     return loss.item()
 
 def main():
@@ -45,7 +46,7 @@ def main():
 
     # dataset, model, optimizer iniitialization
     batch_size = 128
-    dataset = RNNDataset(path="/Users/francesco/Documents/Work/Oligo/Pombo-voucher/data/datasets/artificial_dataset_35_35.csv")
+    dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
     generator = torch.Generator().manual_seed(1234)
     split_lenghs = [round(len(dataset)*length)  for length in [0.4, 0.4, 0.4]]
     split_lenghs[-1] = len(dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
