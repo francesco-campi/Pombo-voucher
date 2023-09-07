@@ -47,20 +47,25 @@ def main():
 
     # dataset, model, optimizer initialization
     batch_size = 128
-    dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
+    dataset = RNNDataset(path="data/datasets/test.csv")
     # dataset = MLPDataset(path="data/datasets/artificial_dataset_35_35.csv")
-    generator = torch.Generator().manual_seed(1234)
-    split_lenghs = [round(len(dataset)*length)  for length in [0.4, 0.2, 0.4]]
-    split_lenghs[-1] = len(dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
-    train, validation, test = data.random_split(dataset=dataset, lengths=split_lenghs, generator=generator)
-    # collate_fn = None
-    collate_fn = pack_collate
-    train_loader = torch.utils.data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-    validation_loader = torch.utils.data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-    test_loader = torch.utils.data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+    # generator = torch.Generator().manual_seed(1234)
+    # split_lenghs = [round(len(dataset)*length)  for length in [0.4, 0.2, 0.4]]
+    # split_lenghs[-1] = len(dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
+    # train, validation, test = data.random_split(dataset=dataset, lengths=split_lenghs, generator=generator)
+    # # collate_fn = None
+    # collate_fn = pack_collate
+    # train_loader = torch.utils.data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    # validation_loader = torch.utils.data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+    # test_loader = torch.utils.data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     loss = torch.nn.MSELoss()
+    # val_loss = eval_epoch(model=model, dataloader=validation_loader, loss=loss, device='cpu')
 
-    val_loss = eval_epoch(model=model, dataloader=validation_loader, loss=loss, device='cpu')
+    loader = data.DataLoader(dataset=dataset, collate_fn=pack_collate)
+    for i in range(len(dataset)):
+        print(dataset[i])
+    val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device='cpu')
+
     print(f"validation loss : {val_loss}")
 
 if __name__ == "__main__":
