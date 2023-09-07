@@ -53,9 +53,11 @@ def main():
     split_lenghs = [round(len(dataset)*length)  for length in [0.4, 0.2, 0.4]]
     split_lenghs[-1] = len(dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
     train, validation, test = data.random_split(dataset=dataset, lengths=split_lenghs, generator=generator)
-    train_loader = torch.utils.data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=pack_collate)
-    validation_loader = torch.utils.data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=pack_collate)
-    test_loader = torch.utils.data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=pack_collate)
+    collate_fn = None
+    # collate_fn = pack_collate
+    train_loader = torch.utils.data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    validation_loader = torch.utils.data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+    test_loader = torch.utils.data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     loss = torch.nn.MSELoss()
 
     val_loss = eval_epoch(model=model, dataloader=validation_loader, loss=loss, device='cpu')
