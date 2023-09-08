@@ -31,8 +31,8 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             data = batch_device[:-1]
             label = batch_device[-1]
             pred = model(*data)
-            print("Prediction")
-            print(pred)
+            # print("Prediction")
+            # print(pred)
             cumulative_loss += loss(pred, label)
     loss = cumulative_loss/len(dataloader)
     return loss.item()
@@ -48,8 +48,8 @@ def main():
     model = model.to(device)
 
     # dataset, model, optimizer initialization
-    batch_size = 1
-    dataset = RNNDataset(path="data/datasets/test.csv")
+    batch_size = 128
+    dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
     # collate_fn = None
     collate_fn = pack_collate
     loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
