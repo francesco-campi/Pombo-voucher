@@ -54,7 +54,7 @@ def main():
     collate_fn = pack_collate
     loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     loss = torch.nn.MSELoss()
-    val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device='cpu')
+    val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device=device)
     print(f"validation loss : {val_loss}")
 
 
