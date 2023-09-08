@@ -20,11 +20,11 @@ class MLPDataset(data.Dataset):
             oligo = row["oligo_sequence"]
             off_target = row["off_target_sequence"]
             encodings[i,:] = torch.cat([self.encode_sequence(oligo), self.encode_sequence(off_target)])
-        self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.float)
+        self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.double)
         self.mean = self.labels.mean()
         self.std = self.labels.std()
         self.labels = (self.labels - self.mean)/self.std # normalize
-        features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.float)
+        features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.double)
         self.data = torch.cat([encodings, features], dim=1)
 
 
@@ -51,7 +51,7 @@ class MLPDataset(data.Dataset):
             else:
                 Warning(f"Nucleotide {nt} not recognized.")
             sequence_encoding[4*i:4*(i+1)] = nt_encoding
-        return sequence_encoding.float()
+        return sequence_encoding.double()
     
 
 
@@ -66,15 +66,15 @@ class RNNDataset(data.Dataset):
         for i, row in database.iterrows():
             oligo = row["oligo_sequence"]
             off_target = row["off_target_sequence"]
-            encoding = torch.empty((len(oligo), 8), dtype=torch.float) #update for deletions and insertions
+            encoding = torch.empty((len(oligo), 8), dtype=torch.double) #update for deletions and insertions
             for j in range(len(oligo)):
-                encoding[j,:] = torch.tensor(self.encode_nt(oligo[j]) + self.encode_nt(off_target[j]), dtype=torch.float)
+                encoding[j,:] = torch.tensor(self.encode_nt(oligo[j]) + self.encode_nt(off_target[j]), dtype=torch.double)
             self.sequences.append(encoding)
-        self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.float)
+        self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.double)
         self.mean = self.labels.mean()
         self.std = self.labels.std()
         self.labels = (self.labels - self.mean)/self.std # normalize
-        self.features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.float)
+        self.features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.double)
         
 
     def __len__(self):
