@@ -22,7 +22,7 @@ import wandb
 
 def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, device: torch.device) -> float:
     model.eval()
-    cumulative_loss = torch.zeros(1,).to(device)
+    cumulative_loss = torch.zeros(1, dtype=torch.float64).to(device)
     with torch.no_grad():
         for batch in dataloader:
             batch_device = []
@@ -34,7 +34,7 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             # print("Prediction")
             # print(pred)
             l = loss(pred, label)
-            print(f'loss: {l}')
+            print(f'loss: {l}, type label: {label.dtype}')
             cumulative_loss += l
     loss = cumulative_loss/len(dataloader)
     return loss.item()
@@ -50,7 +50,7 @@ def main():
     model = model.to(device)
 
     # dataset, model, optimizer initialization
-    batch_size = 128
+    batch_size = 32
     dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
     # collate_fn = None
     collate_fn = pack_collate
