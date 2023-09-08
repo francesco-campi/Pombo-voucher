@@ -66,12 +66,15 @@ def main():
     # collate_fn = None
     collate_fn = pack_collate
     loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
-    loader2 = torch.utils.data.DataLoader(dataset=dataset, batch_size=128, shuffle=False, collate_fn=collate_fn)
+    loader2 = torch.utils.data.DataLoader(dataset=dataset, batch_size=2, shuffle=False, collate_fn=collate_fn)
+    loader3 = torch.utils.data.DataLoader(dataset=dataset, batch_size=128, shuffle=False, collate_fn=collate_fn)
     loss = torch.nn.MSELoss()
     val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device=device)
     print(f"validation loss : {val_loss}")
-    val_loss2 = eval_epoch(model=model, dataloader=loader2, loss=loss, device=device)
-    print(f"validation loss (2): {val_loss2}")
+    val_loss = eval_epoch(model=model, dataloader=loader2, loss=loss, device=device)
+    print(f"validation loss (2): {val_loss}")
+    val_loss = eval_epoch(model=model, dataloader=loader3, loss=loss, device=device)
+    print(f"validation loss (2): {val_loss}")
 
 
 if __name__ == "__main__":
