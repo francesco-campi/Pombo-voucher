@@ -31,6 +31,8 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             data = batch_device[:-1]
             label = batch_device[-1]
             pred = model(*data)
+            print('Data')
+            print(data)
             print('Label')
             print(label)
             print('Prediction')
@@ -52,7 +54,7 @@ def main():
     model = model.to(device)
 
     # dataset, model, optimizer initialization
-    batch_size = 32
+    batch_size = 2
     dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
     # collate_fn = None
     collate_fn = pack_collate
