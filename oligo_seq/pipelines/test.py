@@ -23,6 +23,7 @@ import wandb
 def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, device: torch.device) -> float:
     model.eval()
     cumulative_loss = torch.zeros(1, dtype=torch.float64).to(device)
+    predictions = None
     with torch.no_grad():
         for batch in dataloader:
             batch_device = []
@@ -31,6 +32,10 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             data = batch_device[:-1]
             label = batch_device[-1]
             pred = model(*data)
+            if predictions is None:
+                predictions = pred
+            else:
+                predictions = torch.cat([predictions, pred])
             # print('Data')
             # print(data)
             # print('Label')
@@ -41,6 +46,8 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             # print(f'loss: {l}, type label: {label.dtype}')
             cumulative_loss += l
     loss = cumulative_loss/len(dataloader)
+    print("Predictions")
+    print(predictions)
     return loss.item()
 
 def main():
@@ -58,10 +65,13 @@ def main():
     dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
     # collate_fn = None
     collate_fn = pack_collate
-    loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+    loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
+    loader2 = torch.utils.data.DataLoader(dataset=dataset, batch_size=128, shuffle=False, collate_fn=collate_fn)
     loss = torch.nn.MSELoss()
     val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device=device)
     print(f"validation loss : {val_loss}")
+    val_loss2 = eval_epoch(model=model, dataloader=loader2, loss=loss, device=device)
+    print(f"validation loss (2): {val_loss2}")
 
 
 if __name__ == "__main__":
