@@ -44,6 +44,10 @@ def main():
     model = OligoLSTM(**h_par["model"])
     # model = OligoMLP(**h_par["model"])
     model.load_state_dict(torch.load("data/models/other/lstm_0.pt", map_location=torch.device('cpu')))
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name, param.data, param.data.dtype)
+        break
 
     # dataset, model, optimizer initialization
     batch_size = 128
@@ -58,15 +62,11 @@ def main():
     # train_loader = torch.utils.data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     # validation_loader = torch.utils.data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     # test_loader = torch.utils.data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-    loss = torch.nn.MSELoss()
+    # loss = torch.nn.MSELoss()
     # val_loss = eval_epoch(model=model, dataloader=validation_loader, loss=loss, device='cpu')
+    # print(f"validation loss : {val_loss}")
 
-    loader = data.DataLoader(dataset=dataset, collate_fn=pack_collate)
-    for i in range(len(dataset)):
-        print(dataset[i])
-    val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device='cpu')
-
-    print(f"validation loss : {val_loss}")
+    print(dataset[0][0].data.dtype)
 
 if __name__ == "__main__":
     main()
