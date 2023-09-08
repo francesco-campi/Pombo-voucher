@@ -60,6 +60,7 @@ class OligoRNN(nn.Module):
         act_function = parse_act_function(act_function)
         self.hidden_size= hidden_size
         self.pool = pool
+        self.n_layers = n_layers
         self.recurrent_block = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=n_layers, nonlinearity=nonlinearity, dropout=dropout)
         self.shared_MLP = []
         for _ in range(n_layers_mlp-n_layers_mlp):
@@ -81,7 +82,10 @@ class OligoRNN(nn.Module):
 
 
     def forward(self, sequences: rnn.PackedSequence, features: torch.Tensor):
-        hidden_states = self.recurrent_block(sequences)[0]
+        batch_size = features.shape[0]
+        h_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64)
+        c_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64)
+        hidden_states = self.recurrent_block(sequences, (h_0, c_0))[0]
         # print("Hidden states")
         # print(hidden_states.data)
         # vectorize the porcess of all the hidden states of the batch
