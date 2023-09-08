@@ -31,14 +31,14 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             data = batch_device[:-1]
             label = batch_device[-1]
             pred = model(*data)
-            print('Data')
-            print(data)
-            print('Label')
-            print(label)
-            print('Prediction')
-            print(pred)
+            # print('Data')
+            # print(data)
+            # print('Label')
+            # print(label)
+            # print('Prediction')
+            # print(pred)
             l = loss(pred, label)
-            print(f'loss: {l}, type label: {label.dtype}')
+            # print(f'loss: {l}, type label: {label.dtype}')
             cumulative_loss += l
     loss = cumulative_loss/len(dataloader)
     return loss.item()
