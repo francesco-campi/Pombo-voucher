@@ -35,7 +35,6 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
             print(pred)
             cumulative_loss += loss(pred, label)
     loss = cumulative_loss/len(dataloader)
-    print(len(dataloader))
     return loss.item()
 
 def main():
