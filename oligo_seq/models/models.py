@@ -82,9 +82,10 @@ class OligoRNN(nn.Module):
 
 
     def forward(self, sequences: rnn.PackedSequence, features: torch.Tensor):
+        device = next(self.parameters()).device
         batch_size = features.shape[0]
-        h_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64)
-        c_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64)
+        h_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64).to(device=device)
+        c_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64).to(device=device)
         hidden_states = self.recurrent_block(sequences, (h_0, c_0))[0]
         # print("Hidden states")
         # print(hidden_states.data)
