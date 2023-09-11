@@ -82,8 +82,6 @@ class OligoRNN(nn.Module):
 
 
     def forward(self, sequences: rnn.PackedSequence, features: torch.Tensor):
-        print("Sequences")
-        print(sequences)
         device = next(self.parameters()).device
         batch_size = features.shape[0]
         h_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64).to(device=device)

@@ -129,4 +129,4 @@ def pack_collate(batch: list) -> Tuple[rnn.PackedSequence, torch.Tensor, torch.T
     lengths, perm_idx = lengths.sort(0, descending=True)
     sorted_sequences = [sequences[i] for i in perm_idx]
     padded_sequences = rnn.pad_sequence(sequences=sorted_sequences, batch_first=True)
-    return rnn.pack_padded_sequence(input=padded_sequences, lengths=lengths, batch_first=True), features, labels
+    return rnn.pack_padded_sequence(input=padded_sequences, lengths=lengths, batch_first=True), features[perm_idx,:], labels[perm_idx] # reorder according to the original ordering
