@@ -45,7 +45,6 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
 
 def main():
     # Evaluate the result obtained on teh server
-    torch.set_printoptions(threshold=10_000)
     device = torch.device("cuda") if torch.cuda.is_available() is True else torch.device("cpu")
     with open("data/models/lstm/lstm_0.json") as f:
         h_par = json.load(f)

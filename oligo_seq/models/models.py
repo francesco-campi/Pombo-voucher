@@ -87,12 +87,8 @@ class OligoRNN(nn.Module):
         h_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64).to(device=device)
         c_0 = torch.zeros(size=(self.n_layers, batch_size, self.hidden_size), dtype=torch.float64).to(device=device)
         hidden_states = self.recurrent_block(sequences, (h_0, c_0))[0]
-        print("Hidden states")
-        print(hidden_states.data)
         # vectorize the porcess of all the hidden states of the batch
         processed_hidden_states = self.shared_MLP(hidden_states.data) 
-        print("Processed hidden states")
-        print(processed_hidden_states)
         # create a new PackedSeequence class and unpack it
         processed_hidden_states = rnn.PackedSequence(data=processed_hidden_states, batch_sizes=hidden_states.batch_sizes) 
         unpacked_hidden_state, _ = rnn.pad_packed_sequence(processed_hidden_states, batch_first=True)
@@ -108,11 +104,7 @@ class OligoRNN(nn.Module):
         else:
             Warning(f"The pooling function {self.pool} is not supported.") #change warning type
         pooled_hidden_states = torch.cat([pool_function(h) for h in unpacked_hidden_state], dim=0)
-        print("Pooled idden states")
-        print(pooled_hidden_states)
         processed_features = self.features_mlp(features)
-        print("Processed features")
-        print(processed_features)
         # generate the final prediction
         return self.final_MLP(torch.cat([pooled_hidden_states, processed_features], dim=1)).flatten()
     
