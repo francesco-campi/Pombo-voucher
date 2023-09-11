@@ -36,14 +36,7 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
                 predictions = pred
             else:
                 predictions = torch.cat([predictions, pred])
-            # print('Data')
-            # print(data)
-            # print('Label')
-            # print(label)
-            # print('Prediction')
-            # print(pred)
             l = loss(pred, label)
-            # print(f'loss: {l}, type label: {label.dtype}')
             cumulative_loss += l
     loss = cumulative_loss/len(dataloader)
     print("Predictions")
@@ -53,7 +46,7 @@ def eval_epoch(model: nn.Module, dataloader: data.DataLoader, loss: nn.Module, d
 def main():
     # Evaluate the result obtained on teh server
     device = torch.device("cuda") if torch.cuda.is_available() is True else torch.device("cpu")
-    with open("data/models/other/lstm_0.json") as f:
+    with open("data/models/lstm/lstm_0.json") as f:
         h_par = json.load(f)
     model = OligoLSTM(**h_par["model"])
     # # model = OligoMLP(**h_par["model"])
@@ -65,16 +58,16 @@ def main():
     dataset = RNNDataset(path="data/datasets/artificial_dataset_35_35.csv")
     # collate_fn = None
     collate_fn = pack_collate
-    loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
-    loader2 = torch.utils.data.DataLoader(dataset=dataset, batch_size=2, shuffle=False, collate_fn=collate_fn)
-    loader3 = torch.utils.data.DataLoader(dataset=dataset, batch_size=128, shuffle=False, collate_fn=collate_fn)
+    loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=32, shuffle=False, collate_fn=collate_fn)
+    # loader2 = torch.utils.data.DataLoader(dataset=dataset, batch_size=2, shuffle=False, collate_fn=collate_fn)
+    # loader3 = torch.utils.data.DataLoader(dataset=dataset, batch_size=128, shuffle=False, collate_fn=collate_fn)
     loss = torch.nn.MSELoss()
     val_loss = eval_epoch(model=model, dataloader=loader, loss=loss, device=device)
     print(f"validation loss : {val_loss}")
-    val_loss = eval_epoch(model=model, dataloader=loader2, loss=loss, device=device)
-    print(f"validation loss (2): {val_loss}")
-    val_loss = eval_epoch(model=model, dataloader=loader3, loss=loss, device=device)
-    print(f"validation loss (2): {val_loss}")
+    # val_loss = eval_epoch(model=model, dataloader=loader2, loss=loss, device=device)
+    # print(f"validation loss (2): {val_loss}")
+    # val_loss = eval_epoch(model=model, dataloader=loader3, loss=loss, device=device)
+    # print(f"validation loss (2): {val_loss}")
 
 
 if __name__ == "__main__":
