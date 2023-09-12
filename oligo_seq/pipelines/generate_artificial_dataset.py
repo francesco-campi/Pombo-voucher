@@ -2,10 +2,12 @@ import os
 import shutil
 import argparse
 import yaml
-from random import sample
+import random
 import copy
 import time
 from typing import Tuple
+import logging
+from datetime import datetime
 
 from oligo_designer_toolsuite.database import NcbiGenomicRegionGenerator, EnsemblGenomicRegionGenerator, CustomGenomicRegionGenerator, OligoDatabase, ReferenceDatabase
 from oligo_designer_toolsuite.oligo_property_filter import PropertyFilter, MaskedSequences
@@ -20,10 +22,26 @@ import nupack
 from tqdm import tqdm
 from math import log
 import joblib
+import numpy as np
 
 
 base_pair = {'A':'T', 'T':'A', 'C':'G', 'G':'C'} #, 'a':'t', 't':'a', 'c':'g', 'g':'c'}
 
+def split_list(l: list, spilts_perc: list[float]):
+    assert sum(spilts_perc) == 1, "The splits percentages must su up to 1"
+    n = len(l)
+    n_splits = len(spilts_perc)
+    splits = [0]
+    for i in range(n_splits-1):
+        splits.append(round(splits[-1] + round(spilts_perc[i]*n)))
+    splits.append(n)
+    # randomly shuffle the list
+    random.shuffle(l)
+    # genrate the splits
+    final_splits = []
+    for i in range(n_splits):
+        final_splits.append(l[splits[i]:splits[i+1]])
+    return final_splits
 
 def reverse_complement(strand: str) -> str:
     strand = list(strand)
@@ -32,11 +50,10 @@ def reverse_complement(strand: str) -> str:
         strand[i] = base_pair[strand[i]]
     return "".join(strand)
 
-
 def mutate(nt: str) -> str:
     nts = ['A', 'C', 'T', 'G']
     nts.remove(nt)
-    return sample(nts, 1)[0]
+    return random.sample(nts, 1)[0]
 
 
 def duplexing_log_scores(oligo: str, off_target: str, model: nupack.Model, concentration: float) -> float:
@@ -54,24 +71,57 @@ def duplexing_log_scores(oligo: str, off_target: str, model: nupack.Model, conce
 def generate_off_targets(sequence: Seq, config) -> list[Tuple[str,str, int, float]]:
     model = nupack.Model()
     off_target_regions = [(str(sequence), str(sequence), 0, duplexing_log_scores(str(sequence), str(sequence), model, config["concentration"]))] # include an exact match
-    #mutations
-    for i in range(config["n_mutations"]): # nr of mutations
-        for j in range(len(sequence)):
-            # mutate j and other i-1 nt
+    # single point mutations
+    for i in range(config["max_mutations"]): # nr of mutations
+        for _ in range(1, config["n_mutations_per_type"]+1): # nr of mutations for mutation class
+            # mutate i nt
             target = MutableSeq(sequence)
-            new_nt = mutate(target[j])
-            target.pop(j)
-            target.insert(j, new_nt)
-            unchanges_nts = list(range(len(sequence)))
-            unchanges_nts.remove(j)
-            for _ in range(i-1):
-                k = sample(unchanges_nts, 1)[0]
+            unchanged_nts = list(range(len(sequence)))
+            for _ in range(i):
+                k = random.sample(unchanged_nts, 1)[0]
                 new_nt = mutate(target[k])
                 target.pop(k)
                 target.insert(k, new_nt)
-                unchanges_nts.remove(k)
-            off_target_regions.append((str(sequence), str(target), i+1, duplexing_log_scores(str(sequence), str(target), model, config["concentration"])))
+                unchanged_nts.remove(k)
+            off_target_regions.append((str(sequence), str(target), i, duplexing_log_scores(str(sequence), str(target), model, config["concentration"])))
+    # bulges (insertions and deletions)
+    for i in range(config["max_bulges_size"]):
+        for _ in range(1, config["n_mutations_per_type"]+1):
+            # insert i nts
+            target = MutableSeq(sequence)
+            new_sequence = MutableSeq(sequence)
+            insertion_point = random.randrange(0, len(sequence))
+            for _ in range(i):
+                nt = random.choice(['A', 'T', 'C', 'G'])
+                target.insert(insertion_point, nt)
+                new_sequence.insert(insertion_point, 'N') # generate to have a correct alignement with of the sequnces (N with be encoded as a 0 vector)
+            off_target_regions.append((str(new_sequence), str(target), i, duplexing_log_scores(str(sequence), str(target), model, config["concentration"])))
+            # delete i nts
+            target = MutableSeq(sequence)
+            deletion_point = random.randint(0, len(sequence) - i) # leave the sapace to delete i nucleotides
+            for _ in range(i):
+                target.pop(deletion_point)
+            new_target = MutableSeq(target)
+            for _ in range(i):
+                new_target.insert(deletion_point, 'N') # generate to have a correct alignement with of the sequnces
+            off_target_regions.append((str(sequence), str(new_target), i, duplexing_log_scores(str(sequence), str(target), model, config["concentration"])))
     return off_target_regions
+
+def generate_dataset(alignments: list):
+    dataset = pd.DataFrame(index=list(range(len(alignments))), columns=["oligo_sequence", "oligo_length", "oligo_GC_content", "off_target_sequence", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches", "duplexing_log_score"])
+    for i, (oligo, off_target, nr_mismatches, d_log_score) in enumerate(alignments):
+        dataset.loc[i] = [
+            oligo, #oligo sequence
+            len(oligo),# oligo length
+            gc_fraction(oligo),
+            off_target,
+            len(off_target), # off target length
+            round(gc_fraction(off_target)), # off target gc content
+            mt.Tm_NN(oligo) - mt.Tm_NN(off_target),
+            nr_mismatches,
+            d_log_score,
+        ]
+    return dataset
 
 
 def main():
@@ -107,6 +157,26 @@ def main():
     args = parser.parse_args()
     with open(args.config, "r") as handle:
         config = yaml.safe_load(handle)
+    dataset_name = f"artificial_dataset_{config['min_length']}_{config['max_length']}"
+    # set random seed for reproducibility
+    random.seed(config["seed"])
+    # generate directories
+    os.makedirs(config["dir_output"], exist_ok=True)
+    plots_dir = os.path.join(config["dir_output"], f"{dataset_name}_plots")
+    os.makedirs(plots_dir, exist_ok=True)
+
+    ##############
+    # set logger #
+    ##############
+
+    timestamp = datetime.now()
+    file_logger = f"log_{dataset_name}_{timestamp.year}-{timestamp.month}-{timestamp.day}-{timestamp.hour}-{timestamp.minute}.txt"
+    logging.getLogger("artificial_dataset_generation")
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        level=logging.INFO,
+        handlers=[logging.FileHandler(file_logger), logging.StreamHandler()],
+    )
 
     ################################
     # generate the oligo sequences #
@@ -118,14 +188,14 @@ def main():
             taxon=config["taxon"],
             species=config["species"],
             annotation_release=config["annotation_release"],
-            dir_output="output",
+            dir_output="output_odt",
         )
     elif config["annotation_source"] == "ensembl":
         # dowload the fasta files formthe NCBI server
         region_generator = EnsemblGenomicRegionGenerator(
             species=config["species"],
             annotation_release=config["annotation_release"],
-            dir_output="output",
+            dir_output="output_odt",
         )
     elif config["annotation_source"] == "custom":
         # use already dowloaded files
@@ -136,7 +206,7 @@ def main():
             species=config["species"],
             annotation_release=config["annotation_release"],
             genome_assembly=config["genome_assembly"],
-            dir_output="output",
+            dir_output="output_odt",
         )
     file_transcriptome = region_generator.generate_transcript_reduced_representation()
     # oligo database
@@ -147,7 +217,7 @@ def main():
         annotation_release=region_generator.annotation_release,
         genome_assembly=region_generator.genome_assembly,
         n_jobs=config["n_jobs"],
-        dir_output="output",
+        dir_output="output_odt",
     )
     with open(config["file_genes"]) as handle:
         lines = handle.readlines()
@@ -168,88 +238,116 @@ def main():
         species="Human", 
         annotation_release="110", 
         genome_assembly="GRCh38",
-        dir_output="output_artificial",
+        dir_output="output_odt",
     )
     exact_matches = ExactMatches(dir_specificity="specificity")
     specificity_filter = SpecificityFilter(filters=[exact_matches])
     oligo_database = specificity_filter.apply(oligo_database=oligo_database, reference_database=reference_database)
-    print("Oligo seqeunces generated.")
+    logging.info("Oligo seqeunces generated.")
 
     ##############################
     # sample the oligo sequences #
     ##############################
 
+    # original distribution of the GC content and length
     gc_content =[]
     oligo_length = []
-    # distribution of the GC content and length
     for gene, oligos in oligo_database.database.items():
         for oligo, features in oligos.items():
-            gc_content.append([gc_fraction(features["sequence"]), "Initial"])
-            oligo_length.append([features["length"], "Initial" ])
+            gc_content.append([gc_fraction(features["sequence"]), "Original"])
+            oligo_length.append([features["length"], "Original" ])
+    # split the genes
+    genes = list(oligo_database.database.keys())
+    genes_train, genes_validation, genes_test = split_list(genes, config["splits_size"])
+    # create list of oligos
+    oligos_train = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_train for oligo_id in oligo_database.database[gene]]
+    oligos_validation = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_validation for oligo_id in oligo_database.database[gene]]
+    oligos_test = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_test for oligo_id in oligo_database.database[gene]]
     # sample the oligos
-    sample_per_gene = round(config["n_sampled"]/len(genes)) # sample the same number of oligos from each gene
-    sampled_oligos = {}
-    for gene, oligos in oligo_database.database.items():
-        sampled_oligos[gene] = {}
-        # ids of the samples oligos
-        ids = sample(population=list(oligos.keys()), k=min(sample_per_gene, len(oligos)))
-        for id in ids:
-            sampled_oligos[gene][id] = copy.deepcopy(oligos[id])
-            gc_content.append([gc_fraction(sampled_oligos[gene][id]["sequence"]), "Sampled"])
-            oligo_length.append([sampled_oligos[gene][id]["length"], "Sampled" ])
-    gc_content = pd.DataFrame(data=gc_content, columns=["GC content", "State"])
-    oligo_length = pd.DataFrame(data=oligo_length, columns=["Length", "State"])
-    oligo_database.database = sampled_oligos
+    sample_train = round(config["splits_size"][0]*config["n_oligos"])
+    oligos_train = random.sample(population=oligos_train, k=sample_train)
+    sample_validation = round(config["splits_size"][1]*config["n_oligos"])
+    oligos_validation = random.sample(population=oligos_validation, k=sample_validation)
+    sample_test= config["n_oligos"] - sample_train - sample_validation
+    oligos_test = random.sample(population=oligos_test, k=sample_test)
+    # sampled distribution of the GC content and length
+    for oligo in oligos_train:
+        gc_content.append([gc_fraction(oligo), "Train"])
+        oligo_length.append([len(oligo), "Train" ])
+    for oligo in oligos_validation:
+        gc_content.append([gc_fraction(oligo), "Validation"])
+        oligo_length.append([len(oligo), "Validation" ])
+    for oligo in oligos_test:
+        gc_content.append([gc_fraction(oligo), "Test"])
+        oligo_length.append([len(oligo), "Test" ])
+    # plot the distributions
+    gc_content = pd.DataFrame(data=gc_content, columns=["GC content", "Source"])
+    oligo_length = pd.DataFrame(data=oligo_length, columns=["Length", "Source"])
     plt.figure(1)
-    sns.violinplot(data=gc_content, y="GC content", x="State")
+    sns.violinplot(data=gc_content, y="GC content", x="Source")
     plt.title("GC content distribution")
+    plt.savefig(os.path.join(plots_dir,"GC_content_distribution.pdf"))
     plt.figure(2)
-    sns.violinplot(data=oligo_length, y="Length", x="State")
+    sns.violinplot(data=oligo_length, y="Length", x="Source")
     plt.title("Oligo length distribution")
-    print("Oligo sequences sampled.")
+    plt.savefig(os.path.join(plots_dir, "Oligo_length_distribution.pdf"))
 
-  
     ################################################################
     # generate artificial off-targets and compute duplexing scores #
     ################################################################
     
-
-    alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
+    # train
+    train_alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
         joblib.delayed(generate_off_targets)(
-            oligo_features["sequence"].upper(), config
+            oligo.upper(), config
         )
-        for _, oligos in oligo_database.database.items() for _, oligo_features in oligos.items()
+        for oligo in oligos_train
     )
-    alignments = [alignment for oliigo_alignments in alignments for alignment in oliigo_alignments]
-
+    train_alignments = [alignment for oligo_alignments in train_alignments for alignment in oligo_alignments] # flatten the returned structure
+    # validation
+    validation_alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
+        joblib.delayed(generate_off_targets)(
+            oligo.upper(), config
+            )
+        for oligo in oligos_validation
+    )
+    validation_alignments = [alignment for oligo_alignments in validation_alignments for alignment in oligo_alignments] # flatten the returned structure
+    # test
+    test_alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
+        joblib.delayed(generate_off_targets)(
+            oligo.upper(), config
+            )
+        for oligo in oligos_test
+    )
+    test_alignments = [alignment for oligo_alignments in test_alignments for alignment in oligo_alignments] # flatten the returned structure
 
     ##################
     # create dataset #
     ##################
 
-
-    dataset = pd.DataFrame(index=list(range(len(alignments))), columns=["oligo_sequence", "oligo_length", "oligo_GC_content", "off_target_sequence", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches", "duplexing_log_score"])
-    for i, (oligo, off_target, nr_mismatches, d_log_score) in enumerate(alignments):
-        dataset.loc[i] = [
-            oligo, #oligo sequence
-            len(oligo),# oligo length
-            gc_fraction(oligo),
-            off_target,
-            len(off_target), # off target length
-            round(gc_fraction(off_target)), # off target gc content
-            mt.Tm_NN(oligo) - mt.Tm_NN(off_target),
-            nr_mismatches,
-            d_log_score,
-        ]
+    train_dataset = generate_dataset(train_alignments)
+    file_train = os.path.join(config["dir_output"], f"{dataset_name}_train.csv")
+    train_dataset.to_csv(file_train)
+    validation_dataset = generate_dataset(validation_alignments)
+    file_validation = os.path.join(config["dir_output"], f"{dataset_name}_validation.csv")
+    validation_dataset.to_csv(file_validation)
+    test_dataset = generate_dataset(test_alignments)
+    file_test = os.path.join(config["dir_output"], f"{dataset_name}_test.csv")
+    test_dataset.to_csv(file_test)
+    logging.info(f"Dataset created and stored at: \n\t - {file_train},\n\t - {file_validation}, \n\t - {file_test}.")
+    # plot distributions of the ground truths
     plt.figure(3)
-    sns.boxplot(x=dataset["duplexing_log_score"])
-    plt.title("Duplexig scores distribution")
-    os.makedirs(config["output"], exist_ok=True)
-    file_dataset = os.path.join(config["output"], f"artificial_dataset_{config['min_length']}_{config['max_length']}.csv")
-    dataset.to_csv(file_dataset)
-    print(f"Dataset created and stored at {file_dataset}.")
-    print(f"Computational time: {time.time() - start}")
-    shutil.rmtree("output")
+    train_dataset["Source"] = "Train"
+    validation_dataset["Source"] = "Validation"
+    test_dataset["Source"] = "Test"
+    dataset = pd.concat([train_dataset, validation_dataset, test_dataset])
+    dataset["Duplexing score"] = dataset["duplexing_log_score"] # rename for better understanding
+    sns.boxplot(data=dataset, x="Source", y="Duplexing score")
+    plt.title("Duplexing scores distributions")
+    plt.savefig(os.path.join(plots_dir,"Duplexing_scores_distribution.pdf"))
+    
+    logging.info(f"Computational time: {time.time() - start}")
+    shutil.rmtree("output_odt") #remove oligo designer toolsuite output
     plt.show()
 
 

@@ -1,15 +1,19 @@
-output : data/datasets # path to the folder where the dataset will be stored
+dir_output : data/datasets # path to the folder where the dataset will be stored
 min_length: 15  # minimum length of the oligos
-max_length: 15  # maximum length of the oligos
-file_genes: "data/genes/custom_10.txt"  # path to the file containing the desired genes
-n_mutations: 10  # maximum number of mutated nucleotides
-n_sampled: 10  # number of sampled oligos (the final dataset size will be O(M*s*n) )
+max_length: 100  # maximum length of the oligos
+splits_size: [0.5, 0.2, 0.3]  # train , validation and test splits
+file_genes: "data/genes/ncbi_3000.txt"  # path to the file containing the desired genes
+max_mutations: 10  # maximum number of mutated nucleotides (mm)
+max_bulges_size: 3  # maximum size of insertion or deletions (mb)
+n_mutations_per_type: 10  # number of off-targets generate for each class of perturbations (nm)
+n_oligos: 2000  # number of sampled oligos (n0) (the final dataset size will be O(no * nm * (mm + mb)) )
 concentration: 1e-6  # strand concentrations int the tube
 annotation_source: custom  # source of the genomic files, available options are [custom, ncbi, ensembl]
 taxon: vertebrate_mammalian  # taxon of teh species we are intereste, oly for source: ncbi
 species: Homo_sapiens # optional: species of provided annotation, leave empty if unknown
 annotation_release: 110 # optional: release number of provided annotation, leave empty if unknown
-n_jobs: 4  # number of available CPUs (if None the maximum number of CPUs will be used)
+n_jobs: 5  # number of available CPUs (if None the maximum number of CPUs will be used)
+seed: 1234
 
 ######### only for custom source ##########
 file_annotation : data/annotations/GCF_000001405.40_GRCh38.p14_genomic.gtf  # GTF file with gene annotation
