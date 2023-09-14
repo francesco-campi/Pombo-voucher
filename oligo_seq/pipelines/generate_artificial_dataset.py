@@ -72,7 +72,7 @@ def generate_off_targets(sequence: Seq, config) -> list[Tuple[str,str, int, floa
     model = nupack.Model()
     off_target_regions = [(str(sequence), str(sequence), 0, duplexing_log_scores(str(sequence), str(sequence), model, config["concentration"]))] # include an exact match
     # single point mutations
-    for i in range(config["max_mutations"]): # nr of mutations
+    for i in range(1, config["max_mutations"]+1): # nr of mutations
         for _ in range(1, config["n_mutations_per_type"]+1): # nr of mutations for mutation class
             # mutate i nt
             target = MutableSeq(sequence)
@@ -85,7 +85,7 @@ def generate_off_targets(sequence: Seq, config) -> list[Tuple[str,str, int, floa
                 unchanged_nts.remove(k)
             off_target_regions.append((str(sequence), str(target), i, duplexing_log_scores(str(sequence), str(target), model, config["concentration"])))
     # bulges (insertions and deletions)
-    for i in range(config["max_bulges_size"]):
+    for i in range(1, config["max_bulges_size"]+1): # nr of mutations
         for _ in range(1, config["n_mutations_per_type"]+1):
             # insert i nts
             target = MutableSeq(sequence)
@@ -208,7 +208,7 @@ def main():
             genome_assembly=config["genome_assembly"],
             dir_output="output_odt",
         )
-    file_transcriptome = region_generator.generate_transcript_reduced_representation()
+    file_transcriptome = region_generator.generate_CDS_reduced_representation(include_exon_junctions=False)
     # oligo database
     oligo_database = OligoDatabase(
         file_fasta=file_transcriptome,
@@ -225,7 +225,7 @@ def main():
     oligo_database.create_database(
         oligo_length_min = config["min_length"], 
         oligo_length_max = config["max_length"], 
-        region_ids = genes
+        region_ids = None # genes
     )
     # Property filtering
     masked_seqeunces = MaskedSequences()
@@ -258,11 +258,14 @@ def main():
             oligo_length.append([features["length"], "Original" ])
     # split the genes
     genes = list(oligo_database.database.keys())
+    print(genes)
     genes_train, genes_validation, genes_test = split_list(genes, config["splits_size"])
+    print(genes_train, genes_validation, genes_test)
     # create list of oligos
     oligos_train = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_train for oligo_id in oligo_database.database[gene]]
     oligos_validation = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_validation for oligo_id in oligo_database.database[gene]]
     oligos_test = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_test for oligo_id in oligo_database.database[gene]]
+    print(len(oligos_train), len(oligos_validation), len(oligos_test))
     # sample the oligos
     sample_train = round(config["splits_size"][0]*config["n_oligos"])
     oligos_train = random.sample(population=oligos_train, k=sample_train)
