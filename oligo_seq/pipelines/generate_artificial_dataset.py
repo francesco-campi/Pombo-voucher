@@ -209,6 +209,7 @@ def main():
             dir_output="output_odt",
         )
     file_transcriptome = region_generator.generate_CDS_reduced_representation(include_exon_junctions=False)
+    logging.info("Transcriptome generated.")
     # oligo database
     oligo_database = OligoDatabase(
         file_fasta=file_transcriptome,
@@ -225,8 +226,9 @@ def main():
     oligo_database.create_database(
         oligo_length_min = config["min_length"], 
         oligo_length_max = config["max_length"], 
-        region_ids = None # genes
+        region_ids = genes
     )
+    logging.info("Oligo seqeunces generated.")
     # Property filtering
     masked_seqeunces = MaskedSequences()
     property_filter = PropertyFilter(filters=[masked_seqeunces])
@@ -243,7 +245,7 @@ def main():
     exact_matches = ExactMatches(dir_specificity="specificity")
     specificity_filter = SpecificityFilter(filters=[exact_matches])
     oligo_database = specificity_filter.apply(oligo_database=oligo_database, reference_database=reference_database)
-    logging.info("Oligo seqeunces generated.")
+    logging.info("Oligo seqeunces filtered.")
 
     ##############################
     # sample the oligo sequences #
