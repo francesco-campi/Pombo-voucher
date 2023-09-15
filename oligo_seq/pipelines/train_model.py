@@ -26,9 +26,10 @@ import wandb
 
 class Objective:
 
-    def __init__(self, config, dataset, logging: logging.Logger) -> None:
+    def __init__(self, config, train_dataset, validation_dataset, logging: logging.Logger) -> None:
         self.config = config
-        self.dataset = dataset
+        self.train_dataset = train_dataset
+        self.validation_dataset = validation_dataset
         self.logging = logging
     def __call__(self, trail: optuna.Trial) -> Any:
 
@@ -41,7 +42,7 @@ class Objective:
         ################
 
         hyperparameters = {}
-        hyperparameters["dataset"] = {"mean": self.dataset.mean.item(), "std": self.dataset.std.item()}
+        hyperparameters["dataset"] = {"mean": self.train_dataset.mean.item(), "std": self.train_dataset.std.item()}
         hyperparameters["model"] = {}
         if self.config["model"] == "mlp":
             hyperparameters["model"]["input_size"] = self.config["input_size"]
@@ -61,6 +62,7 @@ class Objective:
             hyperparameters["model"]["nonlinearity"] = trail.suggest_categorical("nonlinearity", choices=self.config["nonlinearity"])
             hyperparameters["model"]["pool"] = trail.suggest_categorical("pool", choices=self.config["pool"])            
             hyperparameters["model"]["dropout"] = trail.suggest_float("dropout", low=self.config["dropout"][0], high=self.config["dropout"][1])
+            hyperparameters["model"]["bidirectional"] = trail.suggest_categorical("bidirectional", choices=self.config["bidirectional"])
             model = OligoRNN(**hyperparameters["model"])
             collate_fn = pack_collate
         elif self.config["model"] == "lstm":
@@ -72,6 +74,7 @@ class Objective:
             hyperparameters["model"]["act_function"] = trail.suggest_categorical("act_function", choices=self.config["act_function"])
             hyperparameters["model"]["pool"] = trail.suggest_categorical("pool", choices=self.config["pool"])            
             hyperparameters["model"]["dropout"] = trail.suggest_float("dropout", low=self.config["dropout"][0], high=self.config["dropout"][1])
+            hyperparameters["model"]["bidirectional"] = trail.suggest_categorical("bidirectional", choices=self.config["bidirectional"])
             model = OligoLSTM(**hyperparameters["model"])
             collate_fn = pack_collate
         else:
@@ -83,13 +86,9 @@ class Objective:
         #####################
 
         generator = torch.Generator().manual_seed(self.config["split_seed"])
-        split_lenghs = [round(len(self.dataset)*length)  for length in self.config["split_lengths"]]
-        split_lenghs[-1] = len(self.dataset) - sum(split_lenghs[:-1]) # adjust in case there are rounding errors
-        train, validation, test = data.random_split(dataset=self.dataset, lengths=split_lenghs, generator=generator)
         batch_size = trail.suggest_int("batch_size", low=self.config["batch_size"][0], high=self.config["batch_size"][1])
-        train_loader = data.DataLoader(dataset=train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-        validation_loader = data.DataLoader(dataset=validation, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-        test_loader = data.DataLoader(dataset=test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+        train_loader = data.DataLoader(dataset=self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+        validation_loader = data.DataLoader(dataset=self.validation_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
         ####################
         # define optimizer #
@@ -104,7 +103,7 @@ class Objective:
         # train the model #
         ###################
         os.environ["WANDB_SILENT"] = "true"
-        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
+        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['train_dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
         # wandb.define_metric("train_loss", summary="min")
         # wandb.define_metric("validation_loss", summary="min")
         max_patience = self.config["patience"] # for early sotpping
@@ -204,7 +203,7 @@ def main():
 
     timestamp = datetime.now()
     file_logger = f"log_train_{config['model']}_{timestamp.year}-{timestamp.month}-{timestamp.day}-{timestamp.hour}-{timestamp.minute}.txt"
-    logging.getLogger("padlock_probe_designer")
+    logging.getLogger(f"train_{config['model']}")
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
         level=logging.NOTSET,
@@ -218,12 +217,18 @@ def main():
 
     # we define the dataset outside the trial function to avoid processig the data multiple times
     if config["model"] == "mlp":
-        dataset = MLPDataset(path=config["dataset_path"])
+        train_dataset = MLPDataset(path=config["train_dataset_path"])
+        validation_dataset = MLPDataset(path=config["validation_dataset_path"])
     elif config["model"] == "rnn" or config["model"] == "lstm":
-        dataset = RNNDataset(path=config["dataset_path"])
+        train_dataset = RNNDataset(path=config["train_dataset_path"])
+        validation_dataset = RNNDataset(path=config["validation_dataset_path"])
     else: 
         raise ValueError(f"{config['model']} is not supported")
-    logging.info(f"Dataset generated with {len(dataset)} instances.")
+    # normalize labels
+    train_dataset.normalize_labels()
+    validation_dataset.normalize_lables_with_params(train_dataset.mean, train_dataset.std)
+
+    logging.info(f"Datasets generated with {len(train_dataset)} training instances and {len(validation_dataset)} validation instances.")
 
     #####################
     # initialize optuna #
@@ -233,7 +238,7 @@ def main():
     optuna.logging.disable_default_handler()  # Stop showing logs in sys.stderr.
     study = optuna.create_study()
     logging.info("Study created.")
-    study.optimize(func=Objective(config=config, dataset=dataset, logging=logging), n_trials=config["n_trials"])
+    study.optimize(func=Objective(config=config, train_dataset=train_dataset, validation_dataset=validation_dataset, logging=logging), n_trials=config["n_trials"])
 
 
 if __name__ == "__main__":
