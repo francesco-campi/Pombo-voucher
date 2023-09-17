@@ -260,14 +260,11 @@ def main():
             oligo_length.append([features["length"], "Original" ])
     # split the genes
     genes = list(oligo_database.database.keys())
-    print(genes)
     genes_train, genes_validation, genes_test = split_list(genes, config["splits_size"])
-    print(genes_train, genes_validation, genes_test)
     # create list of oligos
     oligos_train = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_train for oligo_id in oligo_database.database[gene]]
     oligos_validation = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_validation for oligo_id in oligo_database.database[gene]]
     oligos_test = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_test for oligo_id in oligo_database.database[gene]]
-    print(len(oligos_train), len(oligos_validation), len(oligos_test))
     # sample the oligos
     sample_train = round(config["splits_size"][0]*config["n_oligos"])
     oligos_train = random.sample(population=oligos_train, k=sample_train)

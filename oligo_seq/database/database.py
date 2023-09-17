@@ -21,9 +21,6 @@ class MLPDataset(data.Dataset):
             off_target = row["off_target_sequence"]
             encodings[i,:] = torch.cat([self.encode_sequence(oligo), self.encode_sequence(off_target)])
         self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.double)
-        self.mean = self.labels.mean()
-        self.std = self.labels.std()
-        self.labels = (self.labels - self.mean)/self.std # normalize
         features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.double)
         self.data = torch.cat([encodings, features], dim=1)
 
@@ -48,11 +45,24 @@ class MLPDataset(data.Dataset):
                 nt_encoding = torch.tensor([0,0,1,0])
             elif nt == 'T' or nt == 't':
                 nt_encoding = torch.tensor([0,0,0,1])
+            elif nt == 'N':
+                nt_encoding = torch.tensor([0,0,0,0])
             else:
                 Warning(f"Nucleotide {nt} not recognized.")
             sequence_encoding[4*i:4*(i+1)] = nt_encoding
         return sequence_encoding.double()
     
+
+    def normalize_labels(self):
+        # the normalization parametes are inferred from the data
+        self.mean = self.labels.mean()
+        self.std = self.labels.std()
+        self.labels = (self.labels - self.mean)/self.std # normalize
+
+
+    def normalize_lables_with_params(self, mean: float, std: float) ->None:
+        # the normalization parametes are passed as arguments
+        self.labels = (self.labels - mean)/std # normalize
 
 
 
@@ -71,9 +81,6 @@ class RNNDataset(data.Dataset):
                 encoding[j,:] = torch.tensor(self.encode_nt(oligo[j]) + self.encode_nt(off_target[j]), dtype=torch.double)
             self.sequences.append(encoding)
         self.labels = torch.tensor(database["duplexing_log_score"], dtype=torch.double)
-        self.mean = self.labels.mean()
-        self.std = self.labels.std()
-        self.labels = (self.labels - self.mean)/self.std # normalize
         self.features = torch.tensor(database[["oligo_length", "oligo_GC_content", "off_target_legth", "off_target_GC_content", "tm_diff", "number_mismatches"]].to_numpy(), dtype=torch.double)
         
 
@@ -104,9 +111,22 @@ class RNNDataset(data.Dataset):
                 nt_encoding = [0,0,1,0]
             elif nt == 'G' or nt == 'g':
                 nt_encoding = [0,0,0,1]
+            elif nt == 'N':
+                nt_encoding = [0,0,0,0]
             else:
                 Warning(f"Nucleotide {nt} not recognized.")
             return nt_encoding
+    
+
+    def normalize_labels(self):
+        # the normalization parametes are inferred from the data
+        self.mean = self.labels.mean()
+        self.std = self.labels.std()
+        self.labels = (self.labels - self.mean)/self.std # normalize
+
+    def normalize_lables_with_params(self, mean: float, std: float) ->None:
+        # the normalization parametes are passed as arguments
+        self.labels = (self.labels - mean)/std # normalize
     
 
 
@@ -121,9 +141,12 @@ def pack_collate(batch: list) -> Tuple[rnn.PackedSequence, torch.Tensor, torch.T
     Returns:
         tuple: Tuple containig the batch elements, namely that encoded sequences, the additional features and the groud-truth labels.
     """
-
-    sequences, features, labels = data._utils.collate.default_collate(batch)
-    sequences = [sequences[i,:,:] for i in range(len(sequences))]
+    tabular = []
+    sequences = []
+    for sequence, features, labels in batch:
+        tabular.append((features, labels))
+        sequences.append(sequence)
+    features, labels = data._utils.collate.default_collate(tabular)
     # sort the sequences in decreasing length order
     lengths = torch.tensor(list(map(len, sequences)))
     lengths, perm_idx = lengths.sort(0, descending=True)
