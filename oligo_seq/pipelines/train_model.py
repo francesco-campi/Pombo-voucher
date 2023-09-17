@@ -85,7 +85,6 @@ class Objective:
         # define dataloader #
         #####################
 
-        generator = torch.Generator().manual_seed(self.config["split_seed"])
         batch_size = trail.suggest_int("batch_size", low=self.config["batch_size"][0], high=self.config["batch_size"][1])
         train_loader = data.DataLoader(dataset=self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
         validation_loader = data.DataLoader(dataset=self.validation_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
