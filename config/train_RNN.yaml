@@ -1,4 +1,4 @@
-rain_dataset_path: data/datasets/artificial_dataset_15_100_train.csv   # path to the train dataset
+train_dataset_path: data/datasets/artificial_dataset_15_100_train.csv   # path to the train dataset
 validation_dataset_path: data/datasets/artificial_dataset_15_100_validation.csv   # path to the validation dataset
 models_path: data/models
 
