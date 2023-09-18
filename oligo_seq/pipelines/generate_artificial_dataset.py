@@ -8,6 +8,7 @@ import time
 from typing import Tuple
 import logging
 from datetime import datetime
+import multiprocess
 
 from oligo_designer_toolsuite.database import NcbiGenomicRegionGenerator, EnsemblGenomicRegionGenerator, CustomGenomicRegionGenerator, OligoDatabase, ReferenceDatabase
 from oligo_designer_toolsuite.oligo_property_filter import PropertyFilter, MaskedSequences
@@ -301,6 +302,13 @@ def main():
     # generate artificial off-targets and compute duplexing scores #
     ################################################################
     
+    pool = multiprocess.Pool(config["n_jobs"])
+    processes_train = [pool.apply_async(generate_off_targets, (oligo.upper(), config)) for oligo in oligos_train]
+    processes_validation = [pool.apply_async(generate_off_targets, (oligo.upper(), config)) for oligo in oligos_validation]
+    processes_test = [pool.apply_async(generate_off_targets, (oligo.upper(), config)) for oligo in oligos_test]
+    train_alignments = [p.get() for p in processes_train]
+    validation_alignments = [p.get() for p in processes_validation]
+    test_alignments = [p.get() for p in processes_test]
     # train
     # train_alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
     #     joblib.delayed(generate_off_targets)(
@@ -308,7 +316,6 @@ def main():
     #     )
     #     for oligo in oligos_train
     # )
-    train_alignments = [generate_off_targets(oligo.upper(), config) for oligo in oligos_train]
     train_alignments = [alignment for oligo_alignments in train_alignments for alignment in oligo_alignments] # flatten the returned structure
     # validation
     # validation_alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
@@ -317,7 +324,6 @@ def main():
     #         )
     #     for oligo in oligos_validation
     # )
-    validation_alignments = [generate_off_targets(oligo.upper(), config) for oligo in oligos_validation]
     validation_alignments = [alignment for oligo_alignments in validation_alignments for alignment in oligo_alignments] # flatten the returned structure
     # test
     # test_alignments = joblib.Parallel(n_jobs=config["n_jobs"])(
@@ -326,9 +332,8 @@ def main():
     #         )
     #     for oligo in oligos_test
     # )
-    test_alignments = [generate_off_targets(oligo.upper(), config) for oligo in oligos_test]
     test_alignments = [alignment for oligo_alignments in test_alignments for alignment in oligo_alignments] # flatten the returned structure
-
+    logging.info("Generated artificial off-targets.")
     ##################
     # create dataset #
     ##################
