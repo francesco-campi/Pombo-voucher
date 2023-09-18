@@ -208,7 +208,7 @@ def main():
             genome_assembly=config["genome_assembly"],
             dir_output="output_odt",
         )
-    file_transcriptome = region_generator.generate_CDS_reduced_representation(include_exon_junctions=False)
+    file_transcriptome = region_generator.generate_transcript_reduced_representation(include_exon_junctions=False)
     logging.info("Transcriptome generated.")
     # oligo database
     oligo_database = OligoDatabase(
@@ -232,7 +232,8 @@ def main():
     # Property filtering
     masked_seqeunces = MaskedSequences()
     property_filter = PropertyFilter(filters=[masked_seqeunces])
-    oligo_database = property_filter.apply(oligo_database=oligo_database, n_jobs=4)
+    oligo_database = property_filter.apply(oligo_database=oligo_database, n_jobs=config["n_jobs"])
+    print("property")
     # Specificity filtering
     reference_database = ReferenceDatabase(
         file_fasta=file_transcriptome, # or just the transciptome?
@@ -272,6 +273,8 @@ def main():
     oligos_validation = random.sample(population=oligos_validation, k=sample_validation)
     sample_test= config["n_oligos"] - sample_train - sample_validation
     oligos_test = random.sample(population=oligos_test, k=sample_test)
+    print(len(oligos_train), len(oligos_validation), len(oligos_test))
+    logging.info("Sampled oligo sequences.")
     # sampled distribution of the GC content and length
     for oligo in oligos_train:
         gc_content.append([gc_fraction(oligo), "Train"])
