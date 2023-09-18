@@ -12,10 +12,10 @@ annotation_source: custom  # source of the genomic files, available options are 
 taxon: vertebrate_mammalian  # taxon of teh species we are intereste, oly for source: ncbi
 species: Homo_sapiens # optional: species of provided annotation, leave empty if unknown
 annotation_release: 110 # optional: release number of provided annotation, leave empty if unknown
-n_jobs: 5  # number of available CPUs (if None the maximum number of CPUs will be used)
+n_jobs: 30  # number of available CPUs (if None the maximum number of CPUs will be used)
 seed: 42
 nupack_cache: 8.0
-nupack_treads: 60
+nupack_threads: 60
 
 ######### only for custom source ##########
 file_annotation : data/annotations/custom_GCF_000001405.40_GRCh38.p14_genomic_chr16.gtf  # GTF file with gene annotation
