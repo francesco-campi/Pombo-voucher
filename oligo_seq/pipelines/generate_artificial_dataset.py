@@ -234,11 +234,13 @@ def main():
         region_ids = genes
     )
     logging.info("Oligo seqeunces generated.")
+    for gene in oligo_database.database.keys():
+        logging.info(f"Gene {gene} has {len(oligo_database.database[gene].keys())} oligos.")
     # Property filtering
     masked_seqeunces = MaskedSequences()
     property_filter = PropertyFilter(filters=[masked_seqeunces])
     oligo_database = property_filter.apply(oligo_database=oligo_database, n_jobs=config["n_jobs"])
-    print("property")
+    logging.info("Oligo sequences filtered (property).")
     # Specificity filtering
     reference_database = ReferenceDatabase(
         file_fasta=file_transcriptome, # or just the transciptome?
@@ -250,8 +252,8 @@ def main():
     )
     exact_matches = ExactMatches(dir_specificity="specificity")
     specificity_filter = SpecificityFilter(filters=[exact_matches])
-    oligo_database = specificity_filter.apply(oligo_database=oligo_database, reference_database=reference_database)
-    logging.info("Oligo seqeunces filtered.")
+    oligo_database = specificity_filter.apply(oligo_database=oligo_database, reference_database=reference_database, n_jobs=config["n_jobs"])
+    logging.info("Oligo sequences filtered (spe).")
 
     ##############################
     # sample the oligo sequences #
