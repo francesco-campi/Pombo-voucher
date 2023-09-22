@@ -9,6 +9,7 @@ from typing import Tuple
 import logging
 from datetime import datetime
 import multiprocess
+import iteration_utilities
 
 from oligo_designer_toolsuite.database import NcbiGenomicRegionGenerator, EnsemblGenomicRegionGenerator, CustomGenomicRegionGenerator, OligoDatabase, ReferenceDatabase
 from oligo_designer_toolsuite.oligo_property_filter import PropertyFilter, MaskedSequences
@@ -242,18 +243,18 @@ def main():
     oligo_database = property_filter.apply(oligo_database=oligo_database, n_jobs=config["n_jobs"])
     logging.info("Oligo sequences filtered (property).")
     # Specificity filtering
-    reference_database = ReferenceDatabase(
-        file_fasta=file_transcriptome, # or just the transciptome?
-        files_source="NCBI", 
-        species="Human", 
-        annotation_release="110", 
-        genome_assembly="GRCh38",
-        dir_output="output_odt",
-    )
-    exact_matches = ExactMatches(dir_specificity="specificity")
-    specificity_filter = SpecificityFilter(filters=[exact_matches])
-    oligo_database = specificity_filter.apply(oligo_database=oligo_database, reference_database=reference_database, n_jobs=config["n_jobs"])
-    logging.info("Oligo sequences filtered (spe).")
+    # reference_database = ReferenceDatabase(
+    #     file_fasta=file_transcriptome, # or just the transciptome?
+    #     files_source="NCBI", 
+    #     species="Human", 
+    #     annotation_release="110", 
+    #     genome_assembly="GRCh38",
+    #     dir_output="output_odt",
+    # )
+    # exact_matches = ExactMatches(dir_specificity="specificity")
+    # specificity_filter = SpecificityFilter(filters=[exact_matches])
+    # oligo_database = specificity_filter.apply(oligo_database=oligo_database, reference_database=reference_database, n_jobs=config["n_jobs"])
+    # logging.info("Oligo sequences filtered (spe).")
 
     ##############################
     # sample the oligo sequences #
@@ -275,13 +276,28 @@ def main():
     oligos_test = [oligo_database.database[gene][oligo_id]["sequence"] for gene in genes_test for oligo_id in oligo_database.database[gene]]
     # sample the oligos
     sample_train = round(config["splits_size"][0]*config["n_oligos"])
-    oligos_train = random.sample(population=oligos_train, k=sample_train)
     sample_validation = round(config["splits_size"][1]*config["n_oligos"])
-    oligos_validation = random.sample(population=oligos_validation, k=sample_validation)
     sample_test= config["n_oligos"] - sample_train - sample_validation
-    oligos_test = random.sample(population=oligos_test, k=sample_test)
-    print(len(oligos_train), len(oligos_validation), len(oligos_test))
-    logging.info("Sampled oligo sequences.")
+    # first sample 10 times the size and get rid of duplicates
+    oligos_train = random.sample(population=oligos_train, k=min(len(oligos_train), sample_train*10))
+    oligos_validation = random.sample(population=oligos_validation, k=min(len(oligos_validation), sample_validation*10))
+    oligos_test = random.sample(population=oligos_test, k=min(len(oligos_test), sample_test*10))
+    duplicated_sequences = list(
+            iteration_utilities.unique_everseen(
+                iteration_utilities.duplicates(oligos_train + oligos_validation + oligos_test)
+            )
+        )
+    for s in duplicated_sequences:
+        oligos_train.remove(s)
+        oligos_validation.remove(s)
+        oligos_test.remove(s)
+    # now sample the remaining oligos
+    if len(oligos_train) < sample_train or len(oligos_validation) < sample_validation or len(oligos_test) < sample_test:
+       raise Warning("Fewr oligos left to sample.")
+    oligos_train = random.sample(population=oligos_train, k=min(len(oligos_train), sample_train))
+    oligos_validation = random.sample(population=oligos_validation, k=min(len(oligos_validation), sample_validation))
+    oligos_test = random.sample(population=oligos_test, k=min(len(oligos_test), sample_test))
+    logging.info(f"Sampled {len(oligos_train)} oligos for training, {len(oligos_validation)} oligos for validation, and {len(oligos_test)} oligos for testing")
     # sampled distribution of the GC content and length
     for oligo in oligos_train:
         gc_content.append([gc_fraction(oligo), "Train"])
