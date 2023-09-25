@@ -102,7 +102,7 @@ class Objective:
         # train the model #
         ###################
         os.environ["WANDB_SILENT"] = "true"
-        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['train_dataset_path'])}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
+        wandb.init(project=f"{self.config['model']}_{os.path.basename(self.config['train_dataset_path']).split('.')[0]}", config={**hyperparameters["model"], **hyperparameters["dataset"], "lr": lr, "batch_size": batch_size}, name=str(trail.number))
         # wandb.define_metric("train_loss", summary="min")
         # wandb.define_metric("validation_loss", summary="min")
         max_patience = self.config["patience"] # for early sotpping
@@ -134,7 +134,7 @@ class Objective:
         # store the model #
         ###################
 
-        model_dir = os.path.join(self.config["models_path"], self.config["model"])
+        model_dir = os.path.join(self.config["models_path"], self.config["model"], os.path.basename(self.config['train_dataset_path']).split('.')[0])
         os.makedirs(model_dir, exist_ok=True)
         model_file = f"{self.config['model']}_{trail.number}.pt"
         torch.save(best_model, os.path.join(model_dir, model_file)) # store the best model
