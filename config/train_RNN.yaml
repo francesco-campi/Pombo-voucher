@@ -21,7 +21,7 @@ nonlinearity: [relu, tanh]  # non -linear function of the RNN block
 act_function: [relu, tanh]  # activation function of the mlp blocks
 pool: [max, min, mean, sum]
 dropout: [0, 0.5]
-bidirectional: [Truem False]
+bidirectional: [True, False]
 
 batch_size: [32, 256]
 lr: [0.00001, 0.01] # learning rate sampled from a loguniform distribution
