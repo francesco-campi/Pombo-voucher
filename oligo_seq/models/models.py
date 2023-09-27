@@ -55,34 +55,63 @@ class OligoRNN(nn.Module):
     shared across all the steps and the uoutput is pooled
     """
 
-    def __init__(self, input_size: int, features_size: int, hidden_size: int, n_layers: int, nonlinearity: str = 'tanh', pool: str = 'max', act_function: str = "relu", n_layers_mlp: int = 1, dropout: float = 0, bidirectional: bool = False) -> None:
+    def __init__(
+            self, 
+            input_size: int, 
+            features_size: int, 
+            hidden_size: int, 
+            hidden_size_ecoder: int, 
+            n_layers: int, 
+            nonlinearity: str = 'tanh', 
+            pool: str = 'max', 
+            act_function: str = "relu", 
+            n_layers_mlp: int = 1, 
+            n_layers_encoder: int = 1, 
+            dropout: float = 0, 
+            bidirectional: bool = False
+        ) -> None:
+
         super().__init__()
         act_function = parse_act_function(act_function)
-        self.hidden_size= hidden_size + (bidirectional * hidden_size) # if bidirectional the output tensor has doubled length
+        hidden_size_shared= hidden_size + (bidirectional * hidden_size) # if bidirectional the output tensor has doubled length
         self.pool = pool
         self.n_layers = n_layers
-        self.recurrent_block = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=n_layers, nonlinearity=nonlinearity, dropout=dropout, bidirectional=bidirectional)
+
+        self.encoding_MLP = [torch.nn.Linear(in_features=input_size, out_features=hidden_size_ecoder), act_function, nn.Dropout(p=dropout)]
+        for _ in range(n_layers_encoder-1):
+            self.encoding_MLP.extend([torch.nn.Linear(in_features=hidden_size_ecoder, out_features=hidden_size_ecoder), act_function, nn.Dropout(p=dropout)])
+        self.encoding_MLP.append(torch.nn.Linear(in_features=hidden_size_ecoder, out_features=hidden_size_ecoder))
+        self.encoding_MLP = nn.Sequential(*self.encoding_MLP)
+
+        self.recurrent_block = torch.nn.RNN(input_size=hidden_size_ecoder, hidden_size=hidden_size, num_layers=n_layers, nonlinearity=nonlinearity, dropout=dropout, bidirectional=bidirectional)
+
         self.shared_MLP = []
-        for _ in range(n_layers_mlp-n_layers_mlp):
-            self.shared_MLP.extend([torch.nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size), act_function, nn.Dropout(p=dropout)])
-        self.shared_MLP.append(torch.nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size))
+        for _ in range(n_layers_mlp):
+            self.shared_MLP.extend([torch.nn.Linear(in_features=hidden_size_shared, out_features=hidden_size_shared), act_function, nn.Dropout(p=dropout)])
+        self.shared_MLP.append(torch.nn.Linear(in_features=hidden_size_shared, out_features=hidden_size_shared))
         self.shared_MLP = nn.Sequential(*self.shared_MLP)
+
         self.features_mlp = torch.nn.Sequential(
             torch.nn.Linear(in_features=features_size, out_features=features_size), 
             act_function, 
             nn.Dropout(p=dropout),
             torch.nn.Linear(in_features=features_size, out_features=features_size),
         )
+
         self.final_MLP = []
         for _ in range(n_layers_mlp):
-            self.final_MLP.extend([torch.nn.Linear(in_features=self.hidden_size + features_size, out_features=self.hidden_size + features_size), act_function, nn.Dropout(p=dropout)])
-        self.final_MLP.append(torch.nn.Linear(in_features=self.hidden_size + features_size, out_features=1))
+            self.final_MLP.extend([torch.nn.Linear(in_features=hidden_size_shared + features_size, out_features=hidden_size_shared + features_size), act_function, nn.Dropout(p=dropout)])
+        self.final_MLP.append(torch.nn.Linear(in_features=hidden_size_shared + features_size, out_features=1))
         self.final_MLP = nn.Sequential(*self.final_MLP)
         self.double()
 
 
     def forward(self, sequences: rnn.PackedSequence, features: torch.Tensor):
-        hidden_states = self.recurrent_block(sequences)[0]
+        # encode the sequences
+        encoded_sequences = self.encoding_MLP(sequences.data)
+        encoded_sequences = rnn.PackedSequence(data=encoded_sequences, batch_sizes=sequences.batch_sizes)
+        # run the recurrent block
+        hidden_states = self.recurrent_block(encoded_sequences)[0]
         # vectorize the porcess of all the hidden states of the batch
         processed_hidden_states = self.shared_MLP(hidden_states.data) 
         # create a new PackedSeequence class and unpack it
@@ -110,7 +139,33 @@ class OligoRNN(nn.Module):
 class OligoLSTM(OligoRNN):
 
 
-    def __init__(self, input_size: int, features_size: int, hidden_size: int, n_layers: int, pool: str = 'max', act_function: str = "relu", n_layers_mlp: int = 1, dropout=0, bidirectional: bool = False) -> None:
-        super().__init__(input_size=input_size, features_size=features_size, hidden_size=hidden_size, n_layers=n_layers, pool=pool, act_function=act_function,  n_layers_mlp=n_layers_mlp, dropout=dropout, bidirectional=bidirectional)
-        self.recurrent_block = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=n_layers, dropout=dropout, bidirectional=bidirectional)
+    def __init__(
+            self, 
+            input_size: int, 
+            features_size: int, 
+            hidden_size: int, 
+            hidden_size_ecoder: int, 
+            n_layers: int, 
+            pool: str = 'max', 
+            act_function: str = "relu", 
+            n_layers_mlp: int = 1, 
+            n_layers_encoder: int = 1, 
+            dropout: float = 0, 
+            bidirectional: bool = False
+        ) -> None:
+
+        super().__init__(
+            input_size=input_size, 
+            features_size=features_size, 
+            hidden_size=hidden_size, 
+            hidden_size_ecoder=hidden_size_ecoder, 
+            n_layers=n_layers, 
+            pool=pool, 
+            act_function=act_function,  
+            n_layers_mlp=n_layers_mlp,
+            n_layers_encoder=n_layers_encoder,
+            dropout=dropout, 
+            bidirectional=bidirectional
+        )
+        self.recurrent_block = torch.nn.LSTM(input_size=hidden_size_ecoder, hidden_size=hidden_size, num_layers=n_layers, dropout=dropout, bidirectional=bidirectional)
         self.double()

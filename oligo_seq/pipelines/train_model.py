@@ -56,8 +56,10 @@ class Objective:
             hyperparameters["model"]["input_size"] = self.config["input_size"]
             hyperparameters["model"]["features_size"] = self.config["features_size"]            
             hyperparameters["model"]["hidden_size"] = trail.suggest_int("hidden_size", low=self.config["hidden_size"][0], high=self.config["hidden_size"][1])
+            hyperparameters["model"]["hidden_size_ecoder"] = trail.suggest_int("hidden_size_ecoder", low=self.config["hidden_size_ecoder"][0], high=self.config["hidden_size_ecoder"][1])
             hyperparameters["model"]["n_layers"] = trail.suggest_int("n_layers", low=self.config["n_layers"][0], high=self.config["n_layers"][1])
             hyperparameters["model"]["n_layers_mlp"] = trail.suggest_int("n_layers_mlp", low=self.config["n_layers_mlp"][0], high=self.config["n_layers_mlp"][1])
+            hyperparameters["model"]["n_layers_encoder"] = trail.suggest_int("n_layers_encoder", low=self.config["n_layers_encoder"][0], high=self.config["n_layers_encoder"][1])
             hyperparameters["model"]["act_function"] = trail.suggest_categorical("act_function", choices=self.config["act_function"])
             hyperparameters["model"]["nonlinearity"] = trail.suggest_categorical("nonlinearity", choices=self.config["nonlinearity"])
             hyperparameters["model"]["pool"] = trail.suggest_categorical("pool", choices=self.config["pool"])            
@@ -69,8 +71,10 @@ class Objective:
             hyperparameters["model"]["input_size"] = self.config["input_size"]
             hyperparameters["model"]["features_size"] = self.config["features_size"]
             hyperparameters["model"]["hidden_size"] = trail.suggest_int("hidden_size", low=self.config["hidden_size"][0], high=self.config["hidden_size"][1])
+            hyperparameters["model"]["hidden_size_ecoder"] = trail.suggest_int("hidden_size_ecoder", low=self.config["hidden_size_ecoder"][0], high=self.config["hidden_size_ecoder"][1])
             hyperparameters["model"]["n_layers"] = trail.suggest_int("n_layers", low=self.config["n_layers"][0], high=self.config["n_layers"][1])
             hyperparameters["model"]["n_layers_mlp"] = trail.suggest_int("n_layers_mlp", low=self.config["n_layers_mlp"][0], high=self.config["n_layers_mlp"][1])
+            hyperparameters["model"]["n_layers_encoder"] = trail.suggest_int("n_layers_encoder", low=self.config["n_layers_encoder"][0], high=self.config["n_layers_encoder"][1])
             hyperparameters["model"]["act_function"] = trail.suggest_categorical("act_function", choices=self.config["act_function"])
             hyperparameters["model"]["pool"] = trail.suggest_categorical("pool", choices=self.config["pool"])            
             hyperparameters["model"]["dropout"] = trail.suggest_float("dropout", low=self.config["dropout"][0], high=self.config["dropout"][1])
